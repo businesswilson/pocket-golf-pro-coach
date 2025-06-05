@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -10,6 +10,42 @@ const LaunchMonitor: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState(golfClubs[0]);
   const [isRecording, setIsRecording] = useState(false);
   const [metrics, setMetrics] = useState<SwingMetrics | null>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Initialize camera on component mount
+  useEffect(() => {
+    initializeCamera();
+    return () => {
+      // Clean up camera stream when component unmounts
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const initializeCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera on mobile
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      setCameraStream(stream);
+      setCameraError(null);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setCameraError('Camera access denied or not available');
+    }
+  };
 
   const simulateSwing = () => {
     setIsRecording(true);
@@ -89,38 +125,70 @@ const LaunchMonitor: React.FC = () => {
             <CardTitle className="text-lg">Camera View</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`aspect-video bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden ${
-              isRecording ? 'animate-pulse-green' : ''
+            <div className={`aspect-video bg-gray-900 rounded-lg overflow-hidden relative ${
+              isRecording ? 'ring-2 ring-red-500' : ''
             }`}>
-              <div className="text-white text-center">
-                {isRecording ? (
+              {cameraError ? (
+                <div className="flex items-center justify-center h-full text-white text-center p-4">
                   <div>
-                    <div className="text-6xl mb-4">📹</div>
-                    <div className="text-xl font-bold">Recording...</div>
-                    <div className="text-sm">240 FPS</div>
+                    <div className="text-4xl mb-4">📷</div>
+                    <div className="text-lg font-bold mb-2">Camera Access Required</div>
+                    <div className="text-sm text-gray-300 mb-4">{cameraError}</div>
+                    <Button 
+                      onClick={initializeCamera}
+                      variant="outline"
+                      className="text-white border-white hover:bg-white hover:text-black"
+                    >
+                      Enable Camera
+                    </Button>
                   </div>
-                ) : (
-                  <div>
-                    <div className="text-6xl mb-4">📱</div>
-                    <div className="text-lg">Position phone behind ball</div>
-                    <div className="text-sm text-gray-300">6-8 feet distance</div>
-                  </div>
-                )}
-              </div>
-              {isRecording && (
-                <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold">
-                  REC
                 </div>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  {!cameraStream && (
+                    <div className="absolute inset-0 flex items-center justify-center text-white">
+                      <div className="text-center">
+                        <div className="text-4xl mb-4">📱</div>
+                        <div className="text-lg">Loading camera...</div>
+                      </div>
+                    </div>
+                  )}
+                  {isRecording && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold animate-pulse">
+                      REC
+                    </div>
+                  )}
+                  {cameraStream && !isRecording && (
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
+                        Position 6-8 feet behind ball • Camera ready
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
             
             <Button
               onClick={simulateSwing}
-              disabled={isRecording}
+              disabled={isRecording || !cameraStream}
               className="w-full mt-4 bg-golf-green hover:bg-golf-green/90"
             >
               {isRecording ? 'Recording Swing...' : 'Start Recording'}
             </Button>
+            
+            {!cameraStream && (
+              <div className="mt-2 text-xs text-orange-600 text-center">
+                📱 Camera access needed for swing analysis
+              </div>
+            )}
           </CardContent>
         </Card>
 
