@@ -1,14 +1,18 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { golfCourse } from '../data/golfCourse';
 import { GolfHole } from '../types/golf';
+import Hole3DVisualization from './Hole3DVisualization';
+import AutomaticScoring from './AutomaticScoring';
 
 const GolfCourse: React.FC = () => {
   const [currentHole, setCurrentHole] = useState(0);
   const [score, setScore] = useState(Array(18).fill(0));
   const [totalStrokes, setTotalStrokes] = useState(0);
+  const [ballPosition, setBallPosition] = useState<{ x: number, y: number, z: number } | undefined>();
+  const [lastScoreType, setLastScoreType] = useState<string>('');
+  const [isSwingMode, setIsSwingMode] = useState(false);
 
   const hole = golfCourse[currentHole];
   const totalPar = golfCourse.reduce((sum, hole) => sum + hole.par, 0);
@@ -20,15 +24,48 @@ const GolfCourse: React.FC = () => {
     setTotalStrokes(totalStrokes - score[currentHole] + strokes);
   };
 
+  const handleAutoScore = (strokes: number, scoreType: string) => {
+    recordScore(strokes);
+    setLastScoreType(scoreType);
+    setIsSwingMode(false);
+  };
+
+  const simulateSwing = () => {
+    setIsSwingMode(true);
+    setLastScoreType('');
+    
+    // Simulate ball flight based on hole difficulty and distance
+    setTimeout(() => {
+      const holeLength = hole.distance / 10;
+      const accuracy = hole.difficulty === 'easy' ? 0.8 : hole.difficulty === 'medium' ? 0.6 : 0.4;
+      
+      // Random position based on skill simulation
+      const targetX = holeLength/2 - 5; // Hole position
+      const targetZ = 0;
+      
+      const randomX = targetX + (Math.random() - 0.5) * (20 * (1 - accuracy));
+      const randomZ = targetZ + (Math.random() - 0.5) * (15 * (1 - accuracy));
+      const randomY = Math.random() * 2 + 0.5; // Ball height when landing
+      
+      setBallPosition({ x: randomX, y: randomY, z: randomZ });
+    }, 2000); // 2 second swing simulation
+  };
+
   const nextHole = () => {
     if (currentHole < 17) {
       setCurrentHole(currentHole + 1);
+      setBallPosition(undefined);
+      setLastScoreType('');
+      setIsSwingMode(false);
     }
   };
 
   const prevHole = () => {
     if (currentHole > 0) {
       setCurrentHole(currentHole - 1);
+      setBallPosition(undefined);
+      setLastScoreType('');
+      setIsSwingMode(false);
     }
   };
 
@@ -51,6 +88,22 @@ const GolfCourse: React.FC = () => {
     if (diff === 1) return 'Bogey';
     if (diff === 2) return 'Double';
     return `+${diff}`;
+  };
+
+  const getScoreTypeColor = (scoreType: string) => {
+    if (scoreType.includes('Hole in One') || scoreType.includes('Albatross') || scoreType.includes('Condor')) {
+      return 'text-purple-600 bg-purple-100';
+    } else if (scoreType.includes('Eagle')) {
+      return 'text-blue-600 bg-blue-100';
+    } else if (scoreType.includes('Birdie')) {
+      return 'text-green-600 bg-green-100';
+    } else if (scoreType === 'Par') {
+      return 'text-gray-600 bg-gray-100';
+    } else if (scoreType.includes('Bogey')) {
+      return 'text-yellow-600 bg-yellow-100';
+    } else {
+      return 'text-red-600 bg-red-100';
+    }
   };
 
   return (
@@ -108,41 +161,54 @@ const GolfCourse: React.FC = () => {
               <div>{hole.description}</div>
             </div>
 
-            {/* Hole Visualization */}
-            <div className="bg-golf-fairway p-4 rounded-lg">
-              <div className="relative h-32 bg-golf-green rounded">
-                {/* Tee */}
-                <div className="absolute bottom-2 left-2 w-3 h-3 bg-white rounded-full flex items-center justify-center">
-                  <div className="w-1 h-1 bg-gray-800 rounded-full"></div>
-                </div>
-                
-                {/* Fairway */}
-                <div className="absolute bottom-2 left-6 right-6 h-2 bg-golf-fairway rounded"></div>
-                
-                {/* Green */}
-                <div className="absolute top-2 right-2 w-8 h-8 rounded-full flex items-center justify-center"
-                     style={{ backgroundColor: 'hsl(var(--golf-green))' }}>
-                  <div className="w-2 h-2 bg-gray-800 rounded-full"></div>
-                </div>
-
-                {/* Hazards */}
-                {hole.hazards.includes('water') && (
-                  <div className="absolute top-1/2 left-1/2 w-12 h-6 bg-golf-water rounded transform -translate-x-1/2 -translate-y-1/2"></div>
-                )}
-                {hole.hazards.includes('bunker') && (
-                  <div className="absolute bottom-8 right-8 w-6 h-4 bg-golf-sand rounded"></div>
-                )}
-              </div>
-              
-              <div className="mt-2 text-xs text-white">
-                <strong>Hazards:</strong> {hole.hazards.join(', ')}
-              </div>
+            {/* 3D Hole Visualization */}
+            <div className="space-y-2">
+              <h3 className="font-semibold text-center">3D Hole View</h3>
+              <Hole3DVisualization 
+                hole={hole}
+                ballPosition={ballPosition}
+                onBallLanding={(position) => setBallPosition(position)}
+              />
             </div>
 
-            {/* Score Entry */}
-            <div className="space-y-3">
+            {/* Swing Action */}
+            <div className="text-center space-y-3">
+              {!isSwingMode && !ballPosition && (
+                <Button
+                  onClick={simulateSwing}
+                  className="w-full bg-golf-green hover:bg-golf-green/90"
+                  size="lg"
+                >
+                  🏌️‍♂️ Take Your Shot
+                </Button>
+              )}
+
+              {isSwingMode && (
+                <div className="p-4 bg-blue-50 rounded-lg">
+                  <div className="text-lg font-semibold mb-2">📹 Analyzing Swing...</div>
+                  <div className="text-sm text-gray-600">
+                    Camera is tracking your ball flight
+                  </div>
+                  <div className="animate-pulse mt-2">
+                    <div className="h-2 bg-blue-300 rounded"></div>
+                  </div>
+                </div>
+              )}
+
+              {lastScoreType && (
+                <div className={`p-4 rounded-lg ${getScoreTypeColor(lastScoreType)}`}>
+                  <div className="text-lg font-bold">{lastScoreType}</div>
+                  <div className="text-sm">
+                    Score: {score[currentHole]} ({getScoreDisplay(score[currentHole], hole.par)})
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Manual Score Override (if needed) */}
+            {score[currentHole] > 0 && (
               <div className="text-center">
-                <div className="text-lg font-semibold mb-2">Record Your Score</div>
+                <div className="text-sm text-gray-600 mb-2">Manual score adjustment:</div>
                 <div className="flex justify-center space-x-2">
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((strokes) => (
                     <Button
@@ -150,7 +216,7 @@ const GolfCourse: React.FC = () => {
                       variant={score[currentHole] === strokes ? "default" : "outline"}
                       size="sm"
                       onClick={() => recordScore(strokes)}
-                      className={`w-10 h-10 ${
+                      className={`w-8 h-8 ${
                         score[currentHole] === strokes ? 'bg-golf-green' : ''
                       }`}
                     >
@@ -159,24 +225,16 @@ const GolfCourse: React.FC = () => {
                   ))}
                 </div>
               </div>
-
-              {score[currentHole] > 0 && (
-                <div className="text-center p-2 bg-gray-50 rounded">
-                  <span className="font-semibold">
-                    {getScoreDisplay(score[currentHole], hole.par)}
-                  </span>
-                  {score[currentHole] !== hole.par && (
-                    <span className={`ml-2 ${
-                      score[currentHole] < hole.par ? 'text-green-600' : 'text-red-600'
-                    }`}>
-                      ({score[currentHole] - hole.par > 0 ? '+' : ''}{score[currentHole] - hole.par})
-                    </span>
-                  )}
-                </div>
-              )}
-            </div>
+            )}
           </CardContent>
         </Card>
+
+        {/* Automatic Scoring Component */}
+        <AutomaticScoring
+          hole={hole}
+          ballLandingPosition={ballPosition}
+          onScoreCalculated={handleAutoScore}
+        />
 
         {/* Navigation */}
         <div className="flex justify-between space-x-4">
