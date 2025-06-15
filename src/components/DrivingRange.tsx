@@ -33,7 +33,7 @@ const DrivingRange: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Use back camera on mobile
+          facingMode: 'user', // Use front camera on mobile
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -176,7 +176,7 @@ const DrivingRange: React.FC = () => {
                   {cameraStream && !isSwinging && (
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
-                        Position device to capture swing • Camera ready
+                        Position device to capture your front • Camera ready
                       </div>
                     </div>
                   )}
@@ -276,7 +276,7 @@ const DrivingRange: React.FC = () => {
           <CardContent className="space-y-2">
             <div className="text-sm">🎯 <strong>Focus on accuracy first</strong> - Distance will come naturally</div>
             <div className="text-sm">⚖️ <strong>Find your rhythm</strong> - Consistent tempo is key</div>
-            <div className="text-sm">📱 <strong>Phone position</strong> - Keep device steady behind ball</div>
+            <div className="text-sm">📱 <strong>Phone position</strong> - Keep device steady in front of you</div>
             <div className="text-sm">🔄 <strong>Practice routine</strong> - Same setup for every shot</div>
           </CardContent>
         </Card>

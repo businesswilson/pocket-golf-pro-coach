@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -29,7 +28,7 @@ const LaunchMonitor: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Use back camera on mobile
+          facingMode: 'user', // Use front camera on mobile
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -168,7 +167,7 @@ const LaunchMonitor: React.FC = () => {
                   {cameraStream && !isRecording && (
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
-                        Position 6-8 feet behind ball • Camera ready
+                        Position device to capture your swing from the front • Camera ready
                       </div>
                     </div>
                   )}
