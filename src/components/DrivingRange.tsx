@@ -4,6 +4,30 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { golfClubs } from '../data/golfClubs';
 
+// A helper function to compare frames for motion.
+const calculateFrameDifference = (frame1: ImageData, frame2: ImageData): number => {
+  const data1 = frame1.data;
+  const data2 = frame2.data;
+  let changedPixels = 0;
+  // This threshold determines how much a pixel's brightness needs to change to be considered "different".
+  const PIXEL_DIFFERENCE_THRESHOLD = 32; // On a scale of 0-255
+
+  // To improve performance, we don't check every pixel. We check every 4th pixel.
+  const step = 4 * 4;
+
+  for (let i = 0; i < data1.length; i += step) {
+    // We convert the pixel to grayscale to only care about brightness changes, not color.
+    const gray1 = data1[i] * 0.299 + data1[i + 1] * 0.587 + data1[i + 2] * 0.114;
+    const gray2 = data2[i] * 0.299 + data2[i + 1] * 0.587 + data2[i + 2] * 0.114;
+
+    if (Math.abs(gray1 - gray2) > PIXEL_DIFFERENCE_THRESHOLD) {
+      changedPixels++;
+    }
+  }
+  // We multiply by the step to get an estimate of total changed pixels.
+  return changedPixels * (step / 4);
+};
+
 const DrivingRange: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState(golfClubs[0]);
   const [isSwinging, setIsSwinging] = useState(false);
@@ -17,6 +41,10 @@ const DrivingRange: React.FC = () => {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const lastFrameData = useRef<ImageData | null>(null);
+  const animationFrameId = useRef<number | null>(null);
+  const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
 
   // Initialize camera on component mount
   useEffect(() => {
@@ -51,41 +79,122 @@ const DrivingRange: React.FC = () => {
     }
   };
 
+  const finishShot = () => {
+    setIsSwinging(false);
+    
+    if (animationFrameId.current) {
+        cancelAnimationFrame(animationFrameId.current);
+        animationFrameId.current = null;
+    }
+    if (analysisTimeoutId.current) {
+        clearTimeout(analysisTimeoutId.current);
+        analysisTimeoutId.current = null;
+    }
+    lastFrameData.current = null;
+      
+    // Generate shot data
+    const baseDistance = selectedClub.distance;
+    const distance = Math.round(baseDistance + (Math.random() * 60 - 30));
+    const accuracyOptions = ['Perfect', 'Good', 'Fair', 'Poor'];
+    const accuracy = accuracyOptions[Math.floor(Math.random() * accuracyOptions.length)];
+    
+    setLastShot({ distance, accuracy });
+    
+    // Update session stats
+    const newTotalShots = sessionStats.totalShots + 1;
+    const newAverageDistance = Math.round(
+      (sessionStats.averageDistance * sessionStats.totalShots + distance) / newTotalShots
+    );
+    const newLongestDrive = Math.max(sessionStats.longestDrive, distance);
+    const accuracyScore = accuracy === 'Perfect' ? 100 : 
+                        accuracy === 'Good' ? 80 : 
+                        accuracy === 'Fair' ? 60 : 40;
+    const newAccuracy = Math.round(
+      (sessionStats.accuracy * sessionStats.totalShots + accuracyScore) / newTotalShots
+    );
+    
+    setSessionStats({
+      totalShots: newTotalShots,
+      averageDistance: newAverageDistance,
+      longestDrive: newLongestDrive,
+      accuracy: newAccuracy
+    });
+  }
+
   const takeShot = () => {
     setIsSwinging(true);
-    
-    setTimeout(() => {
-      setIsSwinging(false);
-      
-      // Generate shot data
-      const baseDistance = selectedClub.distance;
-      const distance = Math.round(baseDistance + (Math.random() * 60 - 30));
-      const accuracyOptions = ['Perfect', 'Good', 'Fair', 'Poor'];
-      const accuracy = accuracyOptions[Math.floor(Math.random() * accuracyOptions.length)];
-      
-      setLastShot({ distance, accuracy });
-      
-      // Update session stats
-      const newTotalShots = sessionStats.totalShots + 1;
-      const newAverageDistance = Math.round(
-        (sessionStats.averageDistance * sessionStats.totalShots + distance) / newTotalShots
-      );
-      const newLongestDrive = Math.max(sessionStats.longestDrive, distance);
-      const accuracyScore = accuracy === 'Perfect' ? 100 : 
-                          accuracy === 'Good' ? 80 : 
-                          accuracy === 'Fair' ? 60 : 40;
-      const newAccuracy = Math.round(
-        (sessionStats.accuracy * sessionStats.totalShots + accuracyScore) / newTotalShots
-      );
-      
-      setSessionStats({
-        totalShots: newTotalShots,
-        averageDistance: newAverageDistance,
-        longestDrive: newLongestDrive,
-        accuracy: newAccuracy
-      });
-    }, 2000);
+    // Set a timeout. If no swing is detected in 10s, we stop.
+    analysisTimeoutId.current = setTimeout(() => {
+        console.log("No swing detected. Finishing shot.");
+        finishShot();
+    }, 10000); // 10 second timeout
   };
+
+  useEffect(() => {
+    if (!isSwinging || !videoRef.current) {
+      return;
+    }
+
+    if (!canvasRef.current) {
+        canvasRef.current = document.createElement('canvas');
+    }
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    if (!ctx) {
+        console.error("Could not get 2d context for analysis.");
+        finishShot();
+        return;
+    }
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    // Don't analyze if canvas has no size, which can happen while the camera is initializing.
+    if (canvas.width === 0 || canvas.height === 0) {
+        return;
+    }
+
+    const MOTION_THRESHOLD_PERCENT = 3; // 3% of pixels need to change to detect a swing.
+
+    const detectMotion = () => {
+        if (!isSwinging || !videoRef.current) return;
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+          const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+          if (lastFrameData.current) {
+              const changedPixels = calculateFrameDifference(lastFrameData.current, currentFrameData);
+              const motionPercent = (changedPixels / (canvas.width * canvas.height)) * 100;
+              
+              if (motionPercent > MOTION_THRESHOLD_PERCENT) {
+                  console.log(`Swing detected! Motion: ${motionPercent.toFixed(2)}%`);
+                  finishShot();
+                  return; // Stop the loop
+              }
+          }
+
+          lastFrameData.current = currentFrameData;
+          animationFrameId.current = requestAnimationFrame(detectMotion);
+        } catch (e) {
+          console.error("Error processing video frame for motion detection:", e);
+          // If we get an error (e.g. tainted canvas), just stop analysis.
+          finishShot();
+        }
+    };
+
+    animationFrameId.current = requestAnimationFrame(detectMotion);
+
+    return () => {
+        if (animationFrameId.current) {
+            cancelAnimationFrame(animationFrameId.current);
+        }
+        if (analysisTimeoutId.current) {
+            clearTimeout(analysisTimeoutId.current);
+        }
+    }
+  }, [isSwinging]);
 
   const getAccuracyColor = (accuracy: string) => {
     switch (accuracy) {
@@ -189,7 +298,7 @@ const DrivingRange: React.FC = () => {
               disabled={isSwinging || !cameraStream}
               className="w-full mt-4 bg-golf-green hover:bg-golf-green/90 text-lg py-6"
             >
-              {isSwinging ? 'Recording Swing...' : '🏌️ Take Shot'}
+              {isSwinging ? 'Analyzing Swing...' : '🏌️ Take Shot'}
             </Button>
             
             {!cameraStream && (
