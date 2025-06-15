@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -15,6 +14,42 @@ const DrivingRange: React.FC = () => {
     longestDrive: 0,
     accuracy: 0
   });
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  // Initialize camera on component mount
+  useEffect(() => {
+    initializeCamera();
+    return () => {
+      // Clean up camera stream when component unmounts
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const initializeCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera on mobile
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      setCameraStream(stream);
+      setCameraError(null);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setCameraError('Camera access denied or not available');
+    }
+  };
 
   const takeShot = () => {
     setIsSwinging(true);
@@ -92,63 +127,76 @@ const DrivingRange: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Range View */}
+        {/* Camera View */}
         <Card className="bg-white/95">
           <CardHeader>
-            <CardTitle className="text-lg">Range View</CardTitle>
+            <CardTitle className="text-lg">Camera View</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="relative">
-              {/* Range visualization */}
-              <div className="bg-golf-fairway rounded-lg p-6 relative overflow-hidden" style={{ height: '200px' }}>
-                {/* Distance markers */}
-                <div className="absolute top-2 left-4 right-4 flex justify-between text-white text-xs">
-                  <span>50y</span>
-                  <span>100y</span>
-                  <span>150y</span>
-                  <span>200y</span>
-                  <span>250y</span>
-                </div>
-                
-                {/* Tee area */}
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                  <div className="w-4 h-4 bg-white rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-gray-800 rounded-full"></div>
+            <div className={`aspect-video bg-gray-900 rounded-lg overflow-hidden relative ${
+              isSwinging ? 'ring-2 ring-red-500' : ''
+            }`}>
+              {cameraError ? (
+                <div className="flex items-center justify-center h-full text-white text-center p-4">
+                  <div>
+                    <div className="text-4xl mb-4">📷</div>
+                    <div className="text-lg font-bold mb-2">Camera Access Required</div>
+                    <div className="text-sm text-gray-300 mb-4">{cameraError}</div>
+                    <Button 
+                      onClick={initializeCamera}
+                      variant="outline"
+                      className="text-white border-white hover:bg-white hover:text-black"
+                    >
+                      Enable Camera
+                    </Button>
                   </div>
                 </div>
-                
-                {/* Target flags */}
-                <div className="absolute top-8 left-1/4 text-red-500 text-lg">🚩</div>
-                <div className="absolute top-12 left-1/2 text-yellow-500 text-lg">🚩</div>
-                <div className="absolute top-8 right-1/4 text-green-500 text-lg">🚩</div>
-                
-                {/* Ball trail for last shot */}
-                {lastShot && !isSwinging && (
-                  <div className="absolute bottom-4 left-1/2 w-1 bg-white rounded transform -translate-x-1/2"
-                       style={{ 
-                         height: `${Math.min(150, lastShot.distance / 2)}px`,
-                         transformOrigin: 'bottom'
-                       }}>
-                  </div>
-                )}
-                
-                {/* Swing animation */}
-                {isSwinging && (
-                  <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full animate-bounce"></div>
-                  </div>
-                )}
-              </div>
-              
-              {/* Shot button */}
-              <Button
-                onClick={takeShot}
-                disabled={isSwinging}
-                className="w-full mt-4 bg-golf-green hover:bg-golf-green/90 text-lg py-6"
-              >
-                {isSwinging ? 'Swinging...' : '🏌️ Take Shot'}
-              </Button>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  {!cameraStream && (
+                    <div className="absolute inset-0 flex items-center justify-center text-white">
+                      <div className="text-center">
+                        <div className="text-4xl mb-4">📱</div>
+                        <div className="text-lg">Loading camera...</div>
+                      </div>
+                    </div>
+                  )}
+                  {isSwinging && (
+                    <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold animate-pulse">
+                      REC
+                    </div>
+                  )}
+                  {cameraStream && !isSwinging && (
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
+                        Position device to capture swing • Camera ready
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
+            
+            <Button
+              onClick={takeShot}
+              disabled={isSwinging || !cameraStream}
+              className="w-full mt-4 bg-golf-green hover:bg-golf-green/90 text-lg py-6"
+            >
+              {isSwinging ? 'Recording Swing...' : '🏌️ Take Shot'}
+            </Button>
+            
+            {!cameraStream && (
+              <div className="mt-2 text-xs text-orange-600 text-center">
+                📱 Camera access needed for swing analysis
+              </div>
+            )}
           </CardContent>
         </Card>
 
