@@ -13,7 +13,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onViewChange }) => {
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
         <div className="text-center text-white py-8">
-          <h1 className="text-3xl font-bold mb-2">⛳ Golf Simulator</h1>
+          <h1 className="text-3xl font-bold mb-2">⛳ Golf Analyzer</h1>
           <p className="text-lg opacity-90">In Your Pocket</p>
           <div className="mt-4 bg-white/10 rounded-lg p-3">
             <p className="text-sm">Professional launch monitor technology in your smartphone</p>
@@ -30,17 +30,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onViewChange }) => {
               <div className="text-3xl mb-2">📊</div>
               <h3 className="font-semibold">Launch Monitor</h3>
               <p className="text-sm text-gray-600 mt-1">Analyze your swing</p>
-            </CardContent>
-          </Card>
-
-          <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
-            onClick={() => onViewChange('course')}
-          >
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-2">⛳</div>
-              <h3 className="font-semibold">Play Course</h3>
-              <p className="text-sm text-gray-600 mt-1">18-hole simulation</p>
             </CardContent>
           </Card>
 

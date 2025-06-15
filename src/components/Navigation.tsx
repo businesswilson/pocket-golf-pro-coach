@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Button } from "@/components/ui/button";
 
@@ -8,8 +9,8 @@ interface NavigationProps {
 
 const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const navItems = [
+    { id: 'home', label: 'Home', icon: '🏠' },
     { id: 'launch-monitor', label: 'Launch Monitor', icon: '📊' },
-    { id: 'course', label: 'Course Play', icon: '⛳' },
     { id: 'range', label: 'Driving Range', icon: '🎯' },
     { id: 'coaching', label: 'Coaching', icon: '👨‍🏫' },
     { id: 'calibration', label: 'Ball Setup', icon: '⚪' },
@@ -41,3 +42,4 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
 };
 
 export default Navigation;
+
