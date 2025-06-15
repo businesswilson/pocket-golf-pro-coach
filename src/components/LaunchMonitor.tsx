@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { golfClubs } from '../data/golfClubs';
 import { SwingMetrics } from '../types/golf';
+import { useSwingAnalysis } from '../hooks/useSwingAnalysis';
 
 // A helper function to compare frames for motion.
 const calculateFrameDifference = (frame1: ImageData, frame2: ImageData): number => {
@@ -36,10 +37,8 @@ const LaunchMonitor: React.FC = () => {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const lastFrameData = useRef<ImageData | null>(null);
-  const animationFrameId = useRef<number | null>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isRecording);
 
   // Initialize camera on component mount
   useEffect(() => {
@@ -74,23 +73,22 @@ const LaunchMonitor: React.FC = () => {
     }
   };
 
-  const finishSwingAnalysis = () => {
+  const finishSwingAnalysis = (peakVelocity: number = 0) => {
     setIsRecording(false);
-    if (animationFrameId.current) {
-      cancelAnimationFrame(animationFrameId.current);
-      animationFrameId.current = null;
-    }
     if (analysisTimeoutId.current) {
         clearTimeout(analysisTimeoutId.current);
         analysisTimeoutId.current = null;
     }
-    lastFrameData.current = null;
       
-    // Generate realistic metrics based on club
+    // Generate more realistic metrics based on club and swing velocity
+    const velocityFactor = 0.1; 
+    const detectedSwingSpeed = peakVelocity * velocityFactor;
+    
     const baseSpeed = selectedClub.type === 'driver' ? 105 : 
                       selectedClub.type === 'iron' ? 85 : 90;
     
-    const swingSpeed = baseSpeed + (Math.random() * 20 - 10);
+    const swingSpeed = detectedSwingSpeed > 30 ? detectedSwingSpeed : baseSpeed + (Math.random() * 20 - 10);
+
     const ballSpeed = swingSpeed * (1.3 + Math.random() * 0.3);
     const smashFactor = ballSpeed / swingSpeed;
     
@@ -100,84 +98,28 @@ const LaunchMonitor: React.FC = () => {
       launchAngle: Math.round(10 + Math.random() * 15),
       spinRate: Math.round(2000 + Math.random() * 3000),
       smashFactor: Math.round(smashFactor * 100) / 100,
-      carryDistance: Math.round(selectedClub.distance + (Math.random() * 40 - 20)),
+      carryDistance: Math.round(selectedClub.distance + (swingSpeed - baseSpeed) * 2.2),
       ballFlight: ['straight', 'draw', 'fade', 'slice', 'hook'][Math.floor(Math.random() * 5)] as any
     };
     
     setMetrics(simulatedMetrics);
   };
 
-  const simulateSwing = () => {
+  const startSwingAnalysis = () => {
+    setMetrics(null);
     setIsRecording(true);
     analysisTimeoutId.current = setTimeout(() => {
         console.log("No swing detected. Finishing analysis.");
-        finishSwingAnalysis();
+        finishSwingAnalysis(0);
     }, 10000); // 10 second timeout
   };
 
   useEffect(() => {
-    if (!isRecording || !videoRef.current) {
-        return;
+    if (swingData) {
+      console.log("Swing detected with data:", swingData);
+      finishSwingAnalysis(swingData.peakVelocity);
     }
-
-    if (!canvasRef.current) {
-        canvasRef.current = document.createElement('canvas');
-    }
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    if (!ctx) {
-        console.error("Could not get 2d context for analysis.");
-        finishSwingAnalysis();
-        return;
-    }
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    if (canvas.width === 0 || canvas.height === 0) {
-        return;
-    }
-
-    const MOTION_THRESHOLD_PERCENT = 3;
-
-    const detectMotion = () => {
-        if (!isRecording || !videoRef.current) return;
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        try {
-          const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-          if (lastFrameData.current) {
-              const changedPixels = calculateFrameDifference(lastFrameData.current, currentFrameData);
-              const motionPercent = (changedPixels / (canvas.width * canvas.height)) * 100;
-              
-              if (motionPercent > MOTION_THRESHOLD_PERCENT) {
-                  console.log(`Swing detected! Motion: ${motionPercent.toFixed(2)}%`);
-                  finishSwingAnalysis();
-                  return; // Stop the loop
-              }
-          }
-
-          lastFrameData.current = currentFrameData;
-          animationFrameId.current = requestAnimationFrame(detectMotion);
-        } catch (e) {
-          console.error("Error processing video frame for motion detection:", e);
-          finishSwingAnalysis();
-        }
-    };
-    
-    animationFrameId.current = requestAnimationFrame(detectMotion);
-
-    return () => {
-        if (animationFrameId.current) {
-            cancelAnimationFrame(animationFrameId.current);
-        }
-        if (analysisTimeoutId.current) {
-            clearTimeout(analysisTimeoutId.current);
-        }
-    }
-  }, [isRecording]);
+  }, [swingData]);
 
   const getBallFlightColor = (flight: string) => {
     switch (flight) {
@@ -253,7 +195,7 @@ const LaunchMonitor: React.FC = () => {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transform -scale-x-100"
                   />
                   {!cameraStream && (
                     <div className="absolute inset-0 flex items-center justify-center text-white">
@@ -268,6 +210,11 @@ const LaunchMonitor: React.FC = () => {
                       REC
                     </div>
                   )}
+                   {(isRecording || isAnalyzing) && (
+                    <div className="absolute top-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm backdrop-blur-sm">
+                      {isAnalyzing ? "Analyzing..." : "Waiting for swing..."}
+                    </div>
+                  )}
                   {cameraStream && !isRecording && (
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
@@ -280,11 +227,11 @@ const LaunchMonitor: React.FC = () => {
             </div>
             
             <Button
-              onClick={simulateSwing}
+              onClick={startSwingAnalysis}
               disabled={isRecording || !cameraStream}
               className="w-full mt-4 bg-golf-green hover:bg-golf-green/90"
             >
-              {isRecording ? 'Analyzing Swing...' : 'Start Recording'}
+              {isRecording ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : 'Start Recording'}
             </Button>
             
             {!cameraStream && (

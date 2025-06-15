@@ -3,30 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { golfClubs } from '../data/golfClubs';
-
-// A helper function to compare frames for motion.
-const calculateFrameDifference = (frame1: ImageData, frame2: ImageData): number => {
-  const data1 = frame1.data;
-  const data2 = frame2.data;
-  let changedPixels = 0;
-  // This threshold determines how much a pixel's brightness needs to change to be considered "different".
-  const PIXEL_DIFFERENCE_THRESHOLD = 32; // On a scale of 0-255
-
-  // To improve performance, we don't check every pixel. We check every 4th pixel.
-  const step = 4 * 4;
-
-  for (let i = 0; i < data1.length; i += step) {
-    // We convert the pixel to grayscale to only care about brightness changes, not color.
-    const gray1 = data1[i] * 0.299 + data1[i + 1] * 0.587 + data1[i + 2] * 0.114;
-    const gray2 = data2[i] * 0.299 + data2[i + 1] * 0.587 + data2[i + 2] * 0.114;
-
-    if (Math.abs(gray1 - gray2) > PIXEL_DIFFERENCE_THRESHOLD) {
-      changedPixels++;
-    }
-  }
-  // We multiply by the step to get an estimate of total changed pixels.
-  return changedPixels * (step / 4);
-};
+import { useSwingAnalysis } from '../hooks/useSwingAnalysis';
 
 const DrivingRange: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState(golfClubs[0]);
@@ -41,16 +18,12 @@ const DrivingRange: React.FC = () => {
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const lastFrameData = useRef<ImageData | null>(null);
-  const animationFrameId = useRef<number | null>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isSwinging);
 
-  // Initialize camera on component mount
   useEffect(() => {
     initializeCamera();
     return () => {
-      // Clean up camera stream when component unmounts
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
       }
@@ -79,22 +52,20 @@ const DrivingRange: React.FC = () => {
     }
   };
 
-  const finishShot = () => {
+  const finishShot = (peakVelocity: number = 0) => {
     setIsSwinging(false);
     
-    if (animationFrameId.current) {
-        cancelAnimationFrame(animationFrameId.current);
-        animationFrameId.current = null;
-    }
     if (analysisTimeoutId.current) {
         clearTimeout(analysisTimeoutId.current);
         analysisTimeoutId.current = null;
     }
-    lastFrameData.current = null;
       
-    // Generate shot data
+    // Generate shot data based on velocity
+    const velocityFactor = 0.02; // Conversion from pixels/sec to yards
+    const detectedDistanceBonus = peakVelocity * velocityFactor;
+    
     const baseDistance = selectedClub.distance;
-    const distance = Math.round(baseDistance + (Math.random() * 60 - 30));
+    const distance = Math.round(baseDistance + detectedDistanceBonus + (Math.random() * 20 - 10));
     const accuracyOptions = ['Perfect', 'Good', 'Fair', 'Poor'];
     const accuracy = accuracyOptions[Math.floor(Math.random() * accuracyOptions.length)];
     
@@ -122,80 +93,21 @@ const DrivingRange: React.FC = () => {
   }
 
   const takeShot = () => {
+    setLastShot(null);
     setIsSwinging(true);
-    // Set a timeout. If no swing is detected in 10s, we stop.
     analysisTimeoutId.current = setTimeout(() => {
         console.log("No swing detected. Finishing shot.");
-        finishShot();
+        finishShot(0);
     }, 10000); // 10 second timeout
   };
 
   useEffect(() => {
-    if (!isSwinging || !videoRef.current) {
-      return;
+    if (swingData) {
+      console.log("Swing detected with data:", swingData);
+      finishShot(swingData.peakVelocity);
     }
-
-    if (!canvasRef.current) {
-        canvasRef.current = document.createElement('canvas');
-    }
-    const video = videoRef.current;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-    if (!ctx) {
-        console.error("Could not get 2d context for analysis.");
-        finishShot();
-        return;
-    }
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    // Don't analyze if canvas has no size, which can happen while the camera is initializing.
-    if (canvas.width === 0 || canvas.height === 0) {
-        return;
-    }
-
-    const MOTION_THRESHOLD_PERCENT = 3; // 3% of pixels need to change to detect a swing.
-
-    const detectMotion = () => {
-        if (!isSwinging || !videoRef.current) return;
-
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        try {
-          const currentFrameData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-
-          if (lastFrameData.current) {
-              const changedPixels = calculateFrameDifference(lastFrameData.current, currentFrameData);
-              const motionPercent = (changedPixels / (canvas.width * canvas.height)) * 100;
-              
-              if (motionPercent > MOTION_THRESHOLD_PERCENT) {
-                  console.log(`Swing detected! Motion: ${motionPercent.toFixed(2)}%`);
-                  finishShot();
-                  return; // Stop the loop
-              }
-          }
-
-          lastFrameData.current = currentFrameData;
-          animationFrameId.current = requestAnimationFrame(detectMotion);
-        } catch (e) {
-          console.error("Error processing video frame for motion detection:", e);
-          // If we get an error (e.g. tainted canvas), just stop analysis.
-          finishShot();
-        }
-    };
-
-    animationFrameId.current = requestAnimationFrame(detectMotion);
-
-    return () => {
-        if (animationFrameId.current) {
-            cancelAnimationFrame(animationFrameId.current);
-        }
-        if (analysisTimeoutId.current) {
-            clearTimeout(analysisTimeoutId.current);
-        }
-    }
-  }, [isSwinging]);
-
+  }, [swingData]);
+  
   const getAccuracyColor = (accuracy: string) => {
     switch (accuracy) {
       case 'Perfect': return 'text-green-600';
@@ -209,7 +121,6 @@ const DrivingRange: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-green-900 to-green-700 p-4 pb-20">
       <div className="max-w-md mx-auto space-y-6">
-        {/* Header */}
         <div className="text-center text-white py-4">
           <h1 className="text-2xl font-bold">🎯 Driving Range</h1>
           <p className="text-lg opacity-90">Practice Your Swing</p>
@@ -267,7 +178,7 @@ const DrivingRange: React.FC = () => {
                     autoPlay
                     playsInline
                     muted
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover transform -scale-x-100"
                   />
                   {!cameraStream && (
                     <div className="absolute inset-0 flex items-center justify-center text-white">
@@ -280,6 +191,11 @@ const DrivingRange: React.FC = () => {
                   {isSwinging && (
                     <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold animate-pulse">
                       REC
+                    </div>
+                  )}
+                  {(isSwinging || isAnalyzing) && (
+                    <div className="absolute top-4 left-4 bg-black/50 text-white px-2 py-1 rounded text-sm backdrop-blur-sm">
+                      {isAnalyzing ? "Analyzing..." : "Waiting for swing..."}
                     </div>
                   )}
                   {cameraStream && !isSwinging && (
@@ -298,7 +214,7 @@ const DrivingRange: React.FC = () => {
               disabled={isSwinging || !cameraStream}
               className="w-full mt-4 bg-golf-green hover:bg-golf-green/90 text-lg py-6"
             >
-              {isSwinging ? 'Analyzing Swing...' : '🏌️ Take Shot'}
+              {isSwinging ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : '🏌️ Take Shot'}
             </Button>
             
             {!cameraStream && (
