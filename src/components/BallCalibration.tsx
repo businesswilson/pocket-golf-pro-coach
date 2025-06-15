@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -7,6 +7,41 @@ const BallCalibration: React.FC = () => {
   const [calibrationStep, setCalibrationStep] = useState(1);
   const [isCalibrating, setIsCalibrating] = useState(false);
   const [ballDetected, setBallDetected] = useState(false);
+
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
+  useEffect(() => {
+    initializeCamera();
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, []);
+
+  const initializeCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: 'environment', // Use back camera for ball calibration
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      setCameraStream(stream);
+      setCameraError(null);
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (error) {
+      console.error('Error accessing camera:', error);
+      setCameraError('Camera access denied or not available. Please grant permission.');
+    }
+  };
 
   const startCalibration = () => {
     setIsCalibrating(true);
@@ -102,57 +137,78 @@ const BallCalibration: React.FC = () => {
             <CardTitle className="text-lg">Camera View</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`aspect-video bg-gray-900 rounded-lg flex items-center justify-center relative overflow-hidden ${
-              isCalibrating ? 'animate-pulse' : ''
+            <div className={`aspect-video bg-gray-900 rounded-lg relative overflow-hidden ${
+              isCalibrating ? 'ring-2 ring-blue-500 animate-pulse' : ''
             }`}>
-              {/* Camera feed simulation */}
-              <div className="text-white text-center relative">
-                {/* Targeting circle */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className={`w-32 h-32 border-4 rounded-full ${
-                    ballDetected ? 'border-green-500' : 'border-white'
-                  } ${isCalibrating ? 'animate-pulse' : ''}`}>
-                    <div className="w-full h-full flex items-center justify-center">
-                      {ballDetected ? (
-                        <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center">
-                          <div className="w-12 h-12 bg-gray-100 rounded-full border-2 border-gray-300"></div>
-                        </div>
-                      ) : (
-                        <div className="text-xs text-center">
-                          <div>Place ball</div>
-                          <div>in center</div>
-                        </div>
-                      )}
-                    </div>
+              {cameraError ? (
+                <div className="flex items-center justify-center h-full text-white text-center p-4">
+                  <div>
+                    <div className="text-4xl mb-4">📷</div>
+                    <div className="text-lg font-bold mb-2">Camera Access Required</div>
+                    <div className="text-sm text-gray-300 mb-4">{cameraError}</div>
+                    <Button 
+                      onClick={initializeCamera}
+                      variant="outline"
+                      className="text-white border-white hover:bg-white hover:text-black"
+                    >
+                      Enable Camera
+                    </Button>
                   </div>
                 </div>
-
-                {/* Status text */}
-                <div className="mt-20">
-                  {isCalibrating ? (
-                    <div>
-                      <div className="text-xl mb-2">🔍</div>
-                      <div>Detecting ball...</div>
-                    </div>
-                  ) : ballDetected ? (
-                    <div>
-                      <div className="text-2xl mb-2">✅</div>
-                      <div className="text-green-400">Ball detected!</div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-2xl mb-2">📱</div>
-                      <div>Position golf ball in frame</div>
+              ) : (
+                <>
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover"
+                  />
+                  {!cameraStream && (
+                    <div className="absolute inset-0 flex items-center justify-center text-white bg-black/50">
+                      <div className="text-center">
+                        <div className="text-4xl mb-4">📱</div>
+                        <div className="text-lg">Loading camera...</div>
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Detection overlay */}
-              {ballDetected && !isCalibrating && (
-                <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                  LOCKED
-                </div>
+                  {/* Targeting circle overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                    <div className={`w-32 h-32 border-4 rounded-full transition-colors ${
+                      ballDetected ? 'border-green-500' : 'border-white/70'
+                    } ${isCalibrating ? 'animate-pulse' : ''}`}>
+                      <div className="w-full h-full flex items-center justify-center">
+                        {!ballDetected && !isCalibrating && (
+                          <div className="text-xs text-center text-white bg-black/50 p-1 rounded">
+                            <div>Place ball</div>
+                            <div>in center</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Status text overlay */}
+                  <div className="absolute bottom-4 left-4 right-4 text-center pointer-events-none">
+                     <div className="bg-black/50 text-white py-1 px-3 rounded-full text-sm inline-block backdrop-blur-sm">
+                        {isCalibrating ? (
+                          <span>🔍 Detecting ball...</span>
+                        ) : ballDetected ? (
+                          <span className="text-green-400 font-semibold">✅ Ball Detected!</span>
+                        ) : (
+                          <span>Position golf ball in frame</span>
+                        )}
+                     </div>
+                  </div>
+
+                  {/* Detection overlay */}
+                  {ballDetected && !isCalibrating && (
+                    <div className="absolute top-4 right-4 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">
+                      LOCKED
+                    </div>
+                  )}
+                </>
               )}
             </div>
 
@@ -161,7 +217,7 @@ const BallCalibration: React.FC = () => {
               {!ballDetected || calibrationStep < 3 ? (
                 <Button
                   onClick={startCalibration}
-                  disabled={isCalibrating}
+                  disabled={isCalibrating || !cameraStream}
                   className="w-full bg-golf-green hover:bg-golf-green/90"
                 >
                   {isCalibrating ? 'Calibrating...' : 'Start Calibration'}
