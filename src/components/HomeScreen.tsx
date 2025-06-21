@@ -70,7 +70,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onViewChange }) => {
               ⚪ Calibrate Golf Ball
             </Button>
             <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-              📱 <strong>Camera Setup:</strong> Position your phone 6-8 feet behind the ball, ensuring the camera captures both your swing and ball flight path.
+              <div className="font-semibold text-blue-800 mb-1">📱 Camera Setup:</div>
+              <div>• Stand behind the ball (normal swing position)</div>
+              <div>• Hold phone <strong>in front of your body</strong></div>
+              <div>• Phone should face the ball from opposite side</div>
+              <div>• Distance: 6-8 feet from ball</div>
             </div>
           </CardContent>
         </Card>
