@@ -9,85 +9,81 @@ interface HomeScreenProps {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onViewChange }) => {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-golf-green to-golf-fairway p-4 pb-20">
-      <div className="max-w-md mx-auto space-y-6">
+    <div className="min-h-screen bg-background p-6 pb-20">
+      <div className="max-w-md mx-auto space-y-8">
         {/* Header */}
-        <div className="text-center text-white py-8">
-          <h1 className="text-3xl font-bold mb-2">⛳ Golf Analyzer</h1>
-          <p className="text-lg opacity-90">In Your Pocket</p>
-          <div className="mt-4 bg-white/10 rounded-lg p-3">
-            <p className="text-sm">Professional launch monitor technology in your smartphone</p>
-          </div>
+        <div className="text-center py-8">
+          <h1 className="text-4xl font-light text-foreground mb-3">Golf Analyzer</h1>
+          <p className="text-lg text-muted-foreground font-light">Professional swing analysis</p>
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+            className="cursor-pointer hover:shadow-md transition-all duration-200 border-0 shadow-sm"
             onClick={() => onViewChange('launch-monitor')}
           >
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-2">📊</div>
-              <h3 className="font-semibold">Launch Monitor</h3>
-              <p className="text-sm text-gray-600 mt-1">Analyze your swing</p>
+            <CardContent className="p-8 text-center">
+              <h3 className="text-xl font-medium mb-2">Launch Monitor</h3>
+              <p className="text-muted-foreground">Professional swing metrics and analysis</p>
             </CardContent>
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+            className="cursor-pointer hover:shadow-md transition-all duration-200 border-0 shadow-sm"
             onClick={() => onViewChange('range')}
           >
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-2">🎯</div>
-              <h3 className="font-semibold">Driving Range</h3>
-              <p className="text-sm text-gray-600 mt-1">Practice swings</p>
+            <CardContent className="p-8 text-center">
+              <h3 className="text-xl font-medium mb-2">Driving Range</h3>
+              <p className="text-muted-foreground">Practice and track your progress</p>
             </CardContent>
           </Card>
 
           <Card 
-            className="cursor-pointer hover:shadow-lg transition-shadow bg-white"
+            className="cursor-pointer hover:shadow-md transition-all duration-200 border-0 shadow-sm"
             onClick={() => onViewChange('coaching')}
           >
-            <CardContent className="p-6 text-center">
-              <div className="text-3xl mb-2">👨‍🏫</div>
-              <h3 className="font-semibold">AI Coach</h3>
-              <p className="text-sm text-gray-600 mt-1">Improve your game</p>
+            <CardContent className="p-8 text-center">
+              <h3 className="text-xl font-medium mb-2">AI Coach</h3>
+              <p className="text-muted-foreground">Personalized improvement suggestions</p>
             </CardContent>
           </Card>
         </div>
 
         {/* Setup Section */}
-        <Card className="bg-white/95">
+        <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle className="text-lg">Setup & Calibration</CardTitle>
+            <CardTitle className="text-xl font-medium">Setup & Calibration</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-4">
             <Button 
               variant="outline" 
-              className="w-full justify-start"
+              className="w-full justify-center py-6 text-base"
               onClick={() => onViewChange('calibration')}
             >
-              ⚪ Calibrate Golf Ball
+              Calibrate Golf Ball
             </Button>
-            <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-              <div className="font-semibold text-blue-800 mb-1">📱 Camera Setup:</div>
-              <div>• Stand behind the ball (normal swing position)</div>
-              <div>• Hold phone <strong>in front of your body</strong></div>
-              <div>• Phone should face the ball from opposite side</div>
-              <div>• Distance: 6-8 feet from ball</div>
+            <div className="bg-muted p-6 rounded-lg">
+              <div className="font-medium text-foreground mb-3">Camera Setup Guidelines:</div>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div>• Stand behind the ball in your normal swing position</div>
+                <div>• Hold phone in front of your body</div>
+                <div>• Phone should face the ball from opposite side</div>
+                <div>• Maintain 6-8 feet distance from ball</div>
+              </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Subscription CTA */}
-        <Card className="bg-gradient-to-r from-yellow-400 to-yellow-600 text-white">
-          <CardContent className="p-6 text-center">
-            <div className="text-2xl mb-2">💎</div>
-            <h3 className="font-bold mb-2">Go Pro</h3>
-            <p className="text-sm mb-4">$15/month • 7-day free trial</p>
+        <Card className="bg-golf-primary text-white border-0 shadow-sm">
+          <CardContent className="p-8 text-center">
+            <h3 className="text-xl font-medium mb-2">Golf Analyzer Pro</h3>
+            <p className="text-white/90 mb-6">Advanced analytics and unlimited sessions</p>
+            <p className="text-lg font-medium mb-4">$15/month • 7-day free trial</p>
             <Button 
               variant="secondary" 
-              className="w-full"
+              className="w-full py-6 text-base"
               onClick={() => onViewChange('subscription')}
             >
               Start Free Trial
