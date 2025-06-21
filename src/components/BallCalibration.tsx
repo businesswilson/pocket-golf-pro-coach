@@ -66,12 +66,12 @@ const BallCalibration: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-700 p-4 pb-20">
+    <div className="min-h-screen bg-white p-4 pb-20">
       <div className="max-w-md mx-auto space-y-6">
         {/* Header */}
-        <div className="text-center text-white py-4">
-          <h1 className="text-2xl font-bold">⚪ Ball Calibration</h1>
-          <p className="text-lg opacity-90">Setup Ball Recognition</p>
+        <div className="text-center py-6">
+          <h1 className="text-3xl font-bold text-black">Ball Calibration</h1>
+          <p className="text-xl text-gray-600 mt-2">Setup Ball Recognition</p>
         </div>
 
         <CalibrationProgress currentStep={calibrationStep} totalSteps={3} />

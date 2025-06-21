@@ -40,41 +40,41 @@ const CalibrationInstructions: React.FC<CalibrationInstructionsProps> = ({ step 
 
   return (
     <>
-      <Card className="bg-white">
+      <Card className="border border-gray-200">
         <CardHeader>
-          <CardTitle className="text-lg">{stepInfo.title}</CardTitle>
+          <CardTitle className="text-xl font-semibold text-black">{stepInfo.title}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <p className="text-gray-700">{stepInfo.description}</p>
-          <div className="p-3 bg-blue-50 rounded-lg">
-            <p className="text-sm text-blue-800">💡 {stepInfo.instruction}</p>
+          <p className="text-gray-700 text-lg">{stepInfo.description}</p>
+          <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+            <p className="text-base text-green-800">{stepInfo.instruction}</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Critical Camera Setup */}
-      <Card className="bg-yellow-50 border-yellow-200">
+      <Card className="bg-black text-white border-2 border-black">
         <CardHeader>
-          <CardTitle className="text-lg text-yellow-800">📱 Critical Camera Setup</CardTitle>
+          <CardTitle className="text-xl font-bold text-white">CRITICAL: Phone Position</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="p-4 bg-yellow-100 rounded-lg border border-yellow-300">
-            <div className="font-bold text-yellow-900 mb-2">⚠️ IMPORTANT: Phone Position</div>
-            <div className="text-sm text-yellow-800 space-y-2">
-              <div>• <strong>Stand BEHIND the ball</strong> (where you normally swing)</div>
-              <div>• <strong>Hold phone IN FRONT of your body</strong>, facing the ball</div>
+        <CardContent className="space-y-4">
+          <div className="p-4 bg-green-500 rounded-lg">
+            <div className="font-bold text-white mb-3 text-lg">IMPORTANT: Phone Position</div>
+            <div className="text-white space-y-2 text-base">
+              <div>• Stand BEHIND the ball (where you normally swing)</div>
+              <div>• Hold phone IN FRONT of your body, facing the ball</div>
               <div>• Phone should be on the OPPOSITE side of the ball from you</div>
               <div>• Distance: 6-8 feet from the ball</div>
             </div>
           </div>
           
-          <div className="p-3 bg-white rounded-lg border">
-            <div className="text-sm text-gray-700">
-              <div className="font-semibold mb-1">Setup Diagram:</div>
-              <div className="font-mono text-xs">
+          <div className="p-4 bg-white text-black rounded-lg">
+            <div className="text-base">
+              <div className="font-semibold mb-2">Setup Diagram:</div>
+              <div className="font-mono text-lg text-center">
                 YOU ← → 📱PHONE ← → ⚪BALL
               </div>
-              <div className="text-xs text-gray-600 mt-1">
+              <div className="text-center text-gray-600 mt-2">
                 (Phone is between you and the ball)
               </div>
             </div>

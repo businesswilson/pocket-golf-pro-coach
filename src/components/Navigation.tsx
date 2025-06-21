@@ -18,7 +18,7 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-border px-2 py-2 z-50">
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 px-2 py-3 z-50">
       <div className="flex justify-around items-center max-w-md mx-auto">
         {navItems.map((item) => (
           <Button
@@ -26,13 +26,13 @@ const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) =>
             variant={currentView === item.id ? "default" : "ghost"}
             size="sm"
             onClick={() => onViewChange(item.id)}
-            className={`flex flex-col items-center p-3 min-w-0 text-xs ${
+            className={`flex flex-col items-center p-3 min-w-0 text-sm font-medium ${
               currentView === item.id 
-                ? 'bg-golf-primary text-white hover:bg-golf-secondary' 
-                : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                ? 'bg-green-500 text-white hover:bg-green-600' 
+                : 'text-black hover:text-black hover:bg-gray-100'
             }`}
           >
-            <span className="font-medium">{item.label}</span>
+            <span>{item.label}</span>
           </Button>
         ))}
       </div>

@@ -12,17 +12,17 @@ const CalibrationTips: React.FC = () => {
   ];
 
   return (
-    <Card className="border-0 shadow-sm">
+    <Card className="border border-gray-200">
       <CardHeader>
-        <CardTitle className="text-lg font-medium">Calibration Tips</CardTitle>
+        <CardTitle className="text-xl font-semibold text-black">Calibration Tips</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
         {tips.map((tip, index) => (
           <div key={index} className="flex space-x-3">
-            <div className="w-2 h-2 bg-golf-primary rounded-full mt-2 flex-shrink-0"></div>
-            <div className="text-sm">
-              <span className="font-medium text-foreground">{tip.label}:</span>
-              <span className="text-muted-foreground ml-1">{tip.text}</span>
+            <div className="w-3 h-3 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+            <div className="text-base">
+              <span className="font-semibold text-black">{tip.label}:</span>
+              <span className="text-gray-600 ml-2">{tip.text}</span>
             </div>
           </div>
         ))}
