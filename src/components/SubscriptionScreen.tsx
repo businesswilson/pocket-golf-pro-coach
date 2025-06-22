@@ -8,7 +8,6 @@ const SubscriptionScreen: React.FC = () => {
 
   const startTrial = () => {
     setIsTrialActive(true);
-    // In a real app, this would integrate with Stripe
     console.log('Starting 7-day free trial...');
   };
 
@@ -16,7 +15,7 @@ const SubscriptionScreen: React.FC = () => {
     { name: 'Launch Monitor Analysis', free: true, pro: true },
     { name: 'Basic Ball Tracking', free: true, pro: true },
     { name: 'Driving Range Practice', free: true, pro: true },
-    { name: '18-Hole Course Simulation', free: false, pro: true },
+    { name: 'Advanced Ball Trajectory Mapping', free: false, pro: true },
     { name: 'AI Coaching & Tips', free: false, pro: true },
     { name: 'Advanced Analytics', free: false, pro: true },
     { name: 'Shot History & Progress', free: false, pro: true },
@@ -114,8 +113,8 @@ const SubscriptionScreen: React.FC = () => {
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-500 rounded-full mt-3 flex-shrink-0"></div>
               <div>
-                <div className="font-bold text-black text-lg">Full Course Experience</div>
-                <div className="text-base text-gray-600">Play our realistic 18-hole championship course with detailed hole-by-hole analysis</div>
+                <div className="font-bold text-black text-lg">Ball Trajectory Mapping</div>
+                <div className="text-base text-gray-600">See exactly where your ball lands with detailed trajectory visualization and impact analysis</div>
               </div>
             </div>
             
@@ -144,18 +143,18 @@ const SubscriptionScreen: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-base italic text-black">"This app has revolutionized my practice sessions. The AI coaching is spot on!"</p>
-              <p className="text-sm text-gray-600 mt-2">- Mike R., Handicap 12 → 8</p>
+              <p className="text-base italic text-black">"The swing analysis has really helped me understand my ball flight patterns!"</p>
+              <p className="text-sm text-gray-600 mt-2">- Mike R., Weekend Golfer</p>
             </div>
             
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-base italic text-black">"Finally, professional launch monitor technology in my pocket. Game changer!"</p>
-              <p className="text-sm text-gray-600 mt-2">- Sarah L., Golf Instructor</p>
+              <p className="text-base italic text-black">"Great app for practicing at the driving range. Love the trajectory mapping!"</p>
+              <p className="text-sm text-gray-600 mt-2">- Sarah L., Golf Enthusiast</p>
             </div>
             
             <div className="p-4 bg-gray-50 border border-gray-200 rounded-lg">
-              <p className="text-base italic text-black">"The course simulation is incredibly realistic. I can practice anywhere!"</p>
-              <p className="text-sm text-gray-600 mt-2">- David K., Weekend Warrior</p>
+              <p className="text-base italic text-black">"Perfect for tracking my swing progress. The AI coaching tips are spot on."</p>
+              <p className="text-sm text-gray-600 mt-2">- David K., Amateur Golfer</p>
             </div>
           </CardContent>
         </Card>

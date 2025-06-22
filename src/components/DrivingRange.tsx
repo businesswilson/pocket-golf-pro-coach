@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { golfClubs } from '../data/golfClubs';
-import { useSwingAnalysis } from '../hooks/useSwingAnalysis';
+import { useSwingAnalysis, ComprehensiveSwingData } from '../hooks/useSwingAnalysis';
+import BallTrajectoryMap from './BallTrajectoryMap';
 
 const DrivingRange: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState(golfClubs[0]);
   const [isSwinging, setIsSwinging] = useState(false);
-  const [lastShot, setLastShot] = useState<{distance: number, accuracy: string} | null>(null);
+  const [lastShot, setLastShot] = useState<{distance: number, accuracy: string, ballFlight: string} | null>(null);
+  const [ballPosition, setBallPosition] = useState<{x: number, y: number, distance: number} | null>(null);
   const [sessionStats, setSessionStats] = useState({
     totalShots: 0,
     averageDistance: 0,
@@ -34,7 +36,7 @@ const DrivingRange: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'user', // Use front camera on mobile
+          facingMode: 'user',
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -52,7 +54,41 @@ const DrivingRange: React.FC = () => {
     }
   };
 
-  const finishShot = (peakVelocity: number = 0) => {
+  const calculateBallFlight = (swingData: ComprehensiveSwingData): string => {
+    const clubFaceAngle = swingData.clubFaceAtImpact;
+    const bodyRotation = swingData.bodyRotationRange;
+    
+    if (Math.abs(clubFaceAngle) < 2 && bodyRotation < 20) return 'straight';
+    if (clubFaceAngle < -5 || bodyRotation > 40) return 'hook';
+    if (clubFaceAngle > 5 || bodyRotation < -40) return 'slice';
+    if (clubFaceAngle < -2) return 'draw';
+    if (clubFaceAngle > 2) return 'fade';
+    if (bodyRotation > 30) return 'pull';
+    if (bodyRotation < -30) return 'push';
+    
+    return 'straight';
+  };
+
+  const calculateBallPosition = (flight: string, distance: number) => {
+    const baseX = 50;
+    let finalX = baseX;
+    
+    switch (flight) {
+      case 'draw': finalX = baseX - 15; break;
+      case 'fade': finalX = baseX + 15; break;
+      case 'slice': finalX = baseX + 30; break;
+      case 'hook': finalX = baseX - 30; break;
+      case 'pull': finalX = baseX - 20; break;
+      case 'push': finalX = baseX + 20; break;
+    }
+    
+    finalX = Math.max(10, Math.min(90, finalX));
+    const finalY = Math.max(10, 90 - (distance / 300) * 80);
+    
+    return { x: finalX, y: finalY, distance };
+  };
+
+  const finishShot = (comprehensiveData?: ComprehensiveSwingData) => {
     setIsSwinging(false);
     
     if (analysisTimeoutId.current) {
@@ -60,16 +96,26 @@ const DrivingRange: React.FC = () => {
         analysisTimeoutId.current = null;
     }
       
-    // Generate shot data based on velocity
-    const velocityFactor = 0.02; // Conversion from pixels/sec to yards
-    const detectedDistanceBonus = peakVelocity * velocityFactor;
+    let ballFlight = 'straight';
+    let distance = selectedClub.distance;
     
-    const baseDistance = selectedClub.distance;
-    const distance = Math.round(baseDistance + detectedDistanceBonus + (Math.random() * 20 - 10));
-    const accuracyOptions = ['Perfect', 'Good', 'Fair', 'Poor'];
-    const accuracy = accuracyOptions[Math.floor(Math.random() * accuracyOptions.length)];
+    if (comprehensiveData) {
+      ballFlight = calculateBallFlight(comprehensiveData);
+      
+      const velocityFactor = 0.02;
+      const detectedDistanceBonus = comprehensiveData.peakVelocity * velocityFactor;
+      distance = Math.round(selectedClub.distance + detectedDistanceBonus + (Math.random() * 20 - 10));
+    } else {
+      distance = Math.round(selectedClub.distance + (Math.random() * 20 - 10));
+      ballFlight = ['straight', 'draw', 'fade', 'slice', 'hook'][Math.floor(Math.random() * 5)];
+    }
     
-    setLastShot({ distance, accuracy });
+    const accuracy = ballFlight === 'straight' ? 'Perfect' : 
+                    ['draw', 'fade'].includes(ballFlight) ? 'Good' : 
+                    ['slice', 'hook'].includes(ballFlight) ? 'Fair' : 'Poor';
+    
+    setLastShot({ distance, accuracy, ballFlight });
+    setBallPosition(calculateBallPosition(ballFlight, distance));
     
     // Update session stats
     const newTotalShots = sessionStats.totalShots + 1;
@@ -94,17 +140,18 @@ const DrivingRange: React.FC = () => {
 
   const takeShot = () => {
     setLastShot(null);
+    setBallPosition(null);
     setIsSwinging(true);
     analysisTimeoutId.current = setTimeout(() => {
         console.log("No swing detected. Finishing shot.");
-        finishShot(0);
-    }, 10000); // 10 second timeout
+        finishShot();
+    }, 10000);
   };
 
   useEffect(() => {
     if (swingData) {
-      console.log("Swing detected with data:", swingData);
-      finishShot(swingData.peakVelocity);
+      console.log("Comprehensive swing data:", swingData);
+      finishShot(swingData);
     }
   }, [swingData]);
   
@@ -112,24 +159,24 @@ const DrivingRange: React.FC = () => {
     switch (accuracy) {
       case 'Perfect': return 'text-green-600';
       case 'Good': return 'text-blue-600';
-      case 'Fair': return 'text-yellow-600';
+      case 'Fair': return 'text-orange-600';
       case 'Poor': return 'text-red-600';
       default: return 'text-gray-600';
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-green-900 to-green-700 p-4 pb-20">
+    <div className="min-h-screen bg-white p-4 pb-20">
       <div className="max-w-md mx-auto space-y-6">
-        <div className="text-center text-white py-4">
-          <h1 className="text-2xl font-bold">🎯 Driving Range</h1>
-          <p className="text-lg opacity-90">Practice Your Swing</p>
+        <div className="text-center text-black py-4">
+          <h1 className="text-2xl font-bold">Driving Range</h1>
+          <p className="text-lg text-gray-600">Practice Your Swing</p>
         </div>
 
         {/* Club Selection */}
-        <Card className="bg-white/95">
+        <Card className="bg-white border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg">Select Club</CardTitle>
+            <CardTitle className="text-lg text-black">Select Club</CardTitle>
           </CardHeader>
           <CardContent>
             <Select onValueChange={(value) => setSelectedClub(golfClubs.find(c => c.id === value) || golfClubs[0])}>
@@ -148,9 +195,9 @@ const DrivingRange: React.FC = () => {
         </Card>
 
         {/* Camera View */}
-        <Card className="bg-white/95">
+        <Card className="bg-white border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg">Camera View</CardTitle>
+            <CardTitle className="text-lg text-black">Camera View</CardTitle>
           </CardHeader>
           <CardContent>
             <div className={`aspect-video bg-gray-900 rounded-lg overflow-hidden relative ${
@@ -212,9 +259,9 @@ const DrivingRange: React.FC = () => {
             <Button
               onClick={takeShot}
               disabled={isSwinging || !cameraStream}
-              className="w-full mt-4 bg-golf-green hover:bg-golf-green/90 text-lg py-6"
+              className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white text-lg py-6"
             >
-              {isSwinging ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : '🏌️ Take Shot'}
+              {isSwinging ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : 'Take Shot'}
             </Button>
             
             {!cameraStream && (
@@ -225,14 +272,23 @@ const DrivingRange: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Ball Trajectory Map */}
+        {lastShot && ballPosition && (
+          <BallTrajectoryMap
+            ballPosition={ballPosition}
+            ballFlight={lastShot.ballFlight}
+            carryDistance={lastShot.distance}
+          />
+        )}
+
         {/* Last Shot Result */}
         {lastShot && (
-          <Card className="bg-white/95">
+          <Card className="bg-white border border-gray-200">
             <CardHeader>
-              <CardTitle className="text-lg">Last Shot</CardTitle>
+              <CardTitle className="text-lg text-black">Last Shot</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div className="text-center p-3 bg-blue-50 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">{lastShot.distance}</div>
                   <div className="text-sm text-gray-600">Distance (yards)</div>
@@ -243,15 +299,19 @@ const DrivingRange: React.FC = () => {
                   </div>
                   <div className="text-sm text-gray-600">Accuracy</div>
                 </div>
+                <div className="text-center p-3 bg-green-50 rounded-lg">
+                  <div className="text-lg font-bold text-green-600 capitalize">{lastShot.ballFlight}</div>
+                  <div className="text-sm text-gray-600">Ball Flight</div>
+                </div>
               </div>
             </CardContent>
           </Card>
         )}
 
         {/* Session Statistics */}
-        <Card className="bg-white/95">
+        <Card className="bg-white border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg">Session Stats</CardTitle>
+            <CardTitle className="text-lg text-black">Session Stats</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-2 gap-4">
@@ -267,8 +327,8 @@ const DrivingRange: React.FC = () => {
                 <div className="text-xl font-bold text-purple-600">{sessionStats.longestDrive}</div>
                 <div className="text-sm text-gray-600">Longest Drive</div>
               </div>
-              <div className="text-center p-3 bg-yellow-50 rounded-lg">
-                <div className="text-xl font-bold text-yellow-600">{sessionStats.accuracy}%</div>
+              <div className="text-center p-3 bg-green-50 rounded-lg">
+                <div className="text-xl font-bold text-green-600">{sessionStats.accuracy}%</div>
                 <div className="text-sm text-gray-600">Accuracy</div>
               </div>
             </div>
@@ -284,6 +344,7 @@ const DrivingRange: React.FC = () => {
                     accuracy: 0
                   });
                   setLastShot(null);
+                  setBallPosition(null);
                 }}
                 className="w-full mt-4"
               >
@@ -294,15 +355,15 @@ const DrivingRange: React.FC = () => {
         </Card>
 
         {/* Practice Tips */}
-        <Card className="bg-white/95">
+        <Card className="bg-white border border-gray-200">
           <CardHeader>
-            <CardTitle className="text-lg">Practice Tips</CardTitle>
+            <CardTitle className="text-lg text-black">Practice Tips</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            <div className="text-sm">🎯 <strong>Focus on accuracy first</strong> - Distance will come naturally</div>
-            <div className="text-sm">⚖️ <strong>Find your rhythm</strong> - Consistent tempo is key</div>
-            <div className="text-sm">📱 <strong>Phone position</strong> - Keep device steady in front of you</div>
-            <div className="text-sm">🔄 <strong>Practice routine</strong> - Same setup for every shot</div>
+            <div className="text-sm text-black"><strong>Focus on accuracy first</strong> - Distance will come naturally</div>
+            <div className="text-sm text-black"><strong>Find your rhythm</strong> - Consistent tempo is key</div>
+            <div className="text-sm text-black"><strong>Phone position</strong> - Keep device steady in front of you</div>
+            <div className="text-sm text-black"><strong>Practice routine</strong> - Same setup for every shot</div>
           </CardContent>
         </Card>
       </div>
