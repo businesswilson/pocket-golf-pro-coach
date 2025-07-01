@@ -33,7 +33,6 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-background">
       {renderCurrentView()}
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
     </div>
   );
 };
