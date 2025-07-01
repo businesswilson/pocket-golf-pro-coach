@@ -1,41 +1,29 @@
-
 import React from 'react';
-import { Button } from "@/components/ui/button";
+import { Link, useLocation } from 'react-router-dom';
 
-interface NavigationProps {
-  currentView: string;
-  onViewChange: (view: string) => void;
-}
+const Navigation: React.FC = () => {
+  const location = useLocation();
 
-const Navigation: React.FC<NavigationProps> = ({ currentView, onViewChange }) => {
   const navItems = [
-    { id: 'home', label: 'Home' },
-    { id: 'launch-monitor', label: 'Launch' },
-    { id: 'range', label: 'Range' },
-    { id: 'coaching', label: 'Coach' },
-    { id: 'calibration', label: 'Setup' },
-    { id: 'subscription', label: 'Pro' },
+    { path: '/', icon: '🏠', label: 'Home', color: 'text-gray-600' },
+    { path: '/driving-range', icon: '⛳', label: 'Range', color: 'text-green-600' },
+    { path: '/launch-monitor', icon: '🚀', label: 'Monitor', color: 'text-blue-600' },
+    { path: '/coaching', icon: '👨‍🏫', label: 'Coaching', color: 'text-purple-600' },
+    { path: '/settings', icon: '⚙️', label: 'Settings', color: 'text-gray-600' },
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 px-2 py-3 z-50">
-      <div className="flex justify-around items-center max-w-md mx-auto">
-        {navItems.map((item) => (
-          <Button
-            key={item.id}
-            variant={currentView === item.id ? "default" : "ghost"}
-            size="sm"
-            onClick={() => onViewChange(item.id)}
-            className={`flex flex-col items-center p-3 min-w-0 text-sm font-medium ${
-              currentView === item.id 
-                ? 'bg-green-500 text-white hover:bg-green-600' 
-                : 'text-black hover:text-black hover:bg-gray-100'
-            }`}
-          >
-            <span>{item.label}</span>
-          </Button>
-        ))}
-      </div>
+    <nav className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-200 py-2 px-4 flex justify-around items-center z-50">
+      {navItems.map((item) => (
+        <Link
+          key={item.path}
+          to={item.path}
+          className={`flex flex-col items-center ${location.pathname === item.path ? 'text-black font-semibold' : item.color}`}
+        >
+          <span className="text-2xl">{item.icon}</span>
+          <span className="text-xs">{item.label}</span>
+        </Link>
+      ))}
     </nav>
   );
 };

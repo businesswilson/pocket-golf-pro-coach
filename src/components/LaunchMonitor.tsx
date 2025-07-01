@@ -6,6 +6,7 @@ import { golfClubs } from '../data/golfClubs';
 import { SwingMetrics } from '../types/golf';
 import { useSwingAnalysis, ComprehensiveSwingData } from '../hooks/useSwingAnalysis';
 import BallTrajectoryMap from './BallTrajectoryMap';
+import { aiService } from '../services/aiService';
 
 // A helper function to compare frames for motion.
 const calculateFrameDifference = (frame1: ImageData, frame2: ImageData): number => {
@@ -40,6 +41,7 @@ const LaunchMonitor: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  const [aiRecommendations, setAiRecommendations] = useState<string[]>([]);
   const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isRecording);
 
   // Initialize camera on component mount
@@ -110,7 +112,7 @@ const LaunchMonitor: React.FC = () => {
     return { x: finalX, y: finalY, distance };
   };
 
-  const finishSwingAnalysis = (comprehensiveData?: ComprehensiveSwingData) => {
+  const finishSwingAnalysis = async (comprehensiveData?: ComprehensiveSwingData) => {
     setIsRecording(false);
     if (analysisTimeoutId.current) {
         clearTimeout(analysisTimeoutId.current);
@@ -123,27 +125,47 @@ const LaunchMonitor: React.FC = () => {
     let spinRate = 2500;
     
     if (comprehensiveData) {
-      ballFlight = calculateBallFlight(comprehensiveData);
-      
-      // Calculate more realistic metrics based on swing data
-      const velocityFactor = 0.1;
-      const detectedSpeed = comprehensiveData.peakVelocity * velocityFactor;
-      swingSpeed = detectedSpeed > 30 ? detectedSpeed : 
-                   selectedClub.type === 'driver' ? 105 : 
-                   selectedClub.type === 'iron' ? 85 : 90;
-      
-      // Adjust launch angle based on swing plane
-      launchAngle = Math.max(5, Math.min(25, 12 + (comprehensiveData.swingPlane / 10)));
-      
-      // Adjust spin rate based on club face angle
-      const faceAngleEffect = Math.abs(comprehensiveData.clubFaceAtImpact) * 100;
-      spinRate = 2500 + faceAngleEffect + (Math.random() * 1000 - 500);
-    } else {
-      // Fallback to random generation
-      swingSpeed += (Math.random() * 20 - 10);
-      launchAngle += (Math.random() * 10 - 5);
-      spinRate += (Math.random() * 1500 - 750);
+      // Use AI service for more accurate analysis
+      const swingAnalysisData = {
+        swingSpeed: comprehensiveData.peakVelocity * 0.1 || 105,
+        ballSpeed: (comprehensiveData.peakVelocity * 0.1 || 105) * 1.35,
+        launchAngle: Math.max(5, Math.min(25, 12 + (comprehensiveData.swingPlane / 10))),
+        spinRate: 2500 + Math.abs(comprehensiveData.clubFaceAtImpact) * 100,
+        clubFaceAngle: comprehensiveData.clubFaceAtImpact,
+        bodyRotation: comprehensiveData.bodyRotationRange,
+        swingTempo: comprehensiveData.swingTempo,
+        velocity: comprehensiveData.peakVelocity
+      };
+
+      try {
+        const aiMetrics = await aiService.analyzeSwing(swingAnalysisData);
+        
+        const ballSpeed = swingAnalysisData.ballSpeed;
+        const smashFactor = ballSpeed / swingAnalysisData.swingSpeed;
+        
+        const simulatedMetrics: SwingMetrics = {
+          swingSpeed: Math.round(swingAnalysisData.swingSpeed),
+          ballSpeed: Math.round(ballSpeed),
+          launchAngle: Math.round(swingAnalysisData.launchAngle),
+          spinRate: Math.round(swingAnalysisData.spinRate),
+          smashFactor: Math.round(smashFactor * 100) / 100,
+          carryDistance: aiMetrics.distance,
+          ballFlight: aiMetrics.ballFlight as any
+        };
+        
+        setMetrics(simulatedMetrics);
+        setBallPosition(calculateBallPosition(aiMetrics.ballFlight, aiMetrics.distance));
+        setAiRecommendations(aiMetrics.recommendations);
+        return;
+      } catch (error) {
+        console.error('AI analysis failed, using fallback:', error);
+      }
     }
+
+    // Fallback to original calculation
+    swingSpeed += (Math.random() * 20 - 10);
+    launchAngle += (Math.random() * 10 - 5);
+    spinRate += (Math.random() * 1500 - 750);
 
     const ballSpeed = swingSpeed * (1.3 + Math.random() * 0.3);
     const smashFactor = ballSpeed / swingSpeed;
@@ -196,7 +218,7 @@ const LaunchMonitor: React.FC = () => {
         {/* Header */}
         <div className="text-center py-4">
           <h1 className="text-2xl font-bold text-black">Launch Monitor</h1>
-          <p className="text-gray-600">Professional swing analysis</p>
+          <p className="text-gray-600">AI-powered swing analysis</p>
         </div>
 
         {/* Club Selection */}
@@ -300,6 +322,28 @@ const LaunchMonitor: React.FC = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* AI Recommendations */}
+        {aiRecommendations.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg text-black flex items-center gap-2">
+                🤖 AI Coaching Tips
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {aiRecommendations.map((tip, index) => (
+                  <div key={index} className="p-3 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="text-sm text-green-800">
+                      <strong>{index + 1}.</strong> {tip}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Ball Trajectory Map */}
         {metrics && ballPosition && (
