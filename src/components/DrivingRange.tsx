@@ -117,7 +117,6 @@ const DrivingRange: React.FC = () => {
     setLastShot({ distance, accuracy, ballFlight });
     setBallPosition(calculateBallPosition(ballFlight, distance));
     
-    // Update session stats
     const newTotalShots = sessionStats.totalShots + 1;
     const newAverageDistance = Math.round(
       (sessionStats.averageDistance * sessionStats.totalShots + distance) / newTotalShots
@@ -206,7 +205,7 @@ const DrivingRange: React.FC = () => {
               {cameraError ? (
                 <div className="flex items-center justify-center h-full text-white text-center p-4">
                   <div>
-                    <div className="text-4xl mb-4">📷</div>
+                    <div className="text-4xl mb-4">CAM</div>
                     <div className="text-lg font-bold mb-2">Camera Access Required</div>
                     <div className="text-sm text-gray-300 mb-4">{cameraError}</div>
                     <Button 
@@ -230,7 +229,7 @@ const DrivingRange: React.FC = () => {
                   {!cameraStream && (
                     <div className="absolute inset-0 flex items-center justify-center text-white">
                       <div className="text-center">
-                        <div className="text-4xl mb-4">📱</div>
+                        <div className="text-4xl mb-4">CAM</div>
                         <div className="text-lg">Loading camera...</div>
                       </div>
                     </div>
@@ -266,7 +265,7 @@ const DrivingRange: React.FC = () => {
             
             {!cameraStream && (
               <div className="mt-2 text-xs text-orange-600 text-center">
-                📱 Camera access needed for swing analysis
+                Camera access needed for swing analysis
               </div>
             )}
           </CardContent>

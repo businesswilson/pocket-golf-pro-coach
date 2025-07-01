@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
@@ -5,11 +6,11 @@ const Navigation: React.FC = () => {
   const location = useLocation();
 
   const navItems = [
-    { path: '/', icon: '🏠', label: 'Home', color: 'text-gray-600' },
-    { path: '/driving-range', icon: '⛳', label: 'Range', color: 'text-green-600' },
-    { path: '/launch-monitor', icon: '🚀', label: 'Monitor', color: 'text-blue-600' },
-    { path: '/coaching', icon: '👨‍🏫', label: 'Coaching', color: 'text-purple-600' },
-    { path: '/settings', icon: '⚙️', label: 'Settings', color: 'text-gray-600' },
+    { path: '/', icon: 'H', label: 'Home', color: 'text-gray-600' },
+    { path: '/driving-range', icon: 'R', label: 'Range', color: 'text-green-600' },
+    { path: '/launch-monitor', icon: 'M', label: 'Monitor', color: 'text-blue-600' },
+    { path: '/coaching', icon: 'C', label: 'Coaching', color: 'text-purple-600' },
+    { path: '/settings', icon: 'S', label: 'Settings', color: 'text-gray-600' },
   ];
 
   return (
@@ -20,7 +21,7 @@ const Navigation: React.FC = () => {
           to={item.path}
           className={`flex flex-col items-center ${location.pathname === item.path ? 'text-black font-semibold' : item.color}`}
         >
-          <span className="text-2xl">{item.icon}</span>
+          <span className="text-2xl font-bold">{item.icon}</span>
           <span className="text-xs">{item.label}</span>
         </Link>
       ))}

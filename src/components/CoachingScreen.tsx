@@ -87,7 +87,6 @@ const CoachingScreen: React.FC = () => {
   };
 
   const getCategoryColor = (category: string) => {
-    // Use consistent green color for all categories
     return 'bg-green-500';
   };
 
