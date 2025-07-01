@@ -28,7 +28,7 @@ const BallCalibration: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'environment', // Use back camera for ball calibration
+          facingMode: 'user', // Use front camera for ball calibration
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }

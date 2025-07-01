@@ -19,6 +19,8 @@ const DrivingRange: React.FC = () => {
   });
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [isCalibrated, setIsCalibrated] = useState(false);
+  const [isCalibrating, setIsCalibrating] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
   const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isSwinging);
@@ -137,7 +139,17 @@ const DrivingRange: React.FC = () => {
     });
   }
 
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setTimeout(() => {
+      setIsCalibrated(true);
+      setIsCalibrating(false);
+    }, 3000);
+  };
+
   const takeShot = () => {
+    if (!isCalibrated) return;
+    
     setLastShot(null);
     setBallPosition(null);
     setIsSwinging(true);
@@ -193,6 +205,27 @@ const DrivingRange: React.FC = () => {
           </CardContent>
         </Card>
 
+        {/* Calibration Section */}
+        {!isCalibrated && (
+          <Card className="bg-white border border-gray-200">
+            <CardHeader>
+              <CardTitle className="text-lg text-black">Ball Calibration Required</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center space-y-4">
+                <p className="text-gray-600">Calibrate ball detection before starting your session</p>
+                <Button
+                  onClick={startCalibration}
+                  disabled={isCalibrating || !cameraStream}
+                  className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  {isCalibrating ? 'Calibrating...' : 'Start Calibration'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Camera View */}
         <Card className="bg-white border border-gray-200">
           <CardHeader>
@@ -234,6 +267,14 @@ const DrivingRange: React.FC = () => {
                       </div>
                     </div>
                   )}
+                  
+                  {/* Red ring around ball when calibrated */}
+                  {isCalibrated && !isSwinging && (
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <div className="w-20 h-20 border-4 border-red-500 rounded-full animate-pulse"></div>
+                    </div>
+                  )}
+                  
                   {isSwinging && (
                     <div className="absolute top-4 right-4 bg-red-500 text-white px-2 py-1 rounded text-sm font-bold animate-pulse">
                       REC
@@ -244,10 +285,15 @@ const DrivingRange: React.FC = () => {
                       {isAnalyzing ? "Analyzing..." : "Waiting for swing..."}
                     </div>
                   )}
-                  {cameraStream && !isSwinging && (
+                  {isCalibrating && (
+                    <div className="absolute top-4 left-4 bg-blue-500 text-white px-2 py-1 rounded text-sm">
+                      Calibrating...
+                    </div>
+                  )}
+                  {cameraStream && !isSwinging && !isCalibrating && (
                     <div className="absolute bottom-4 left-4 right-4">
                       <div className="bg-black/50 text-white text-center py-2 px-4 rounded text-sm">
-                        Position device to capture your front • Camera ready
+                        {isCalibrated ? 'Ball calibrated • Ready to shoot' : 'Calibration required'}
                       </div>
                     </div>
                   )}
@@ -257,16 +303,27 @@ const DrivingRange: React.FC = () => {
             
             <Button
               onClick={takeShot}
-              disabled={isSwinging || !cameraStream}
-              className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white text-lg py-6"
+              disabled={isSwinging || !cameraStream || !isCalibrated}
+              className="w-full mt-4 bg-green-500 hover:bg-green-600 text-white text-lg py-6 disabled:bg-gray-400"
             >
-              {isSwinging ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : 'Take Shot'}
+              {!isCalibrated ? 'Calibration Required' : 
+               isSwinging ? (isAnalyzing ? 'Analyzing Swing...' : 'Ready...') : 'Take Shot'}
             </Button>
             
             {!cameraStream && (
               <div className="mt-2 text-xs text-orange-600 text-center">
                 Camera access needed for swing analysis
               </div>
+            )}
+            
+            {isCalibrated && (
+              <Button
+                variant="outline"
+                onClick={() => setIsCalibrated(false)}
+                className="w-full mt-2"
+              >
+                Recalibrate
+              </Button>
             )}
           </CardContent>
         </Card>
