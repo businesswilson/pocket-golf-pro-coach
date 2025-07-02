@@ -33,6 +33,9 @@ const DrivingRange: React.FC = () => {
       if (cameraStream) {
         cameraStream.getTracks().forEach(track => track.stop());
       }
+      if (ballTrackingRef.current) {
+        clearTimeout(ballTrackingRef.current);
+      }
     };
   }, []);
 
@@ -154,21 +157,62 @@ const DrivingRange: React.FC = () => {
   };
 
   const trackBall = () => {
-    if (!videoRef.current || !isCalibrated) return;
+    if (!videoRef.current || !isCalibrated || !cameraStream) return;
     
-    // Simulate ball tracking with random movement
-    const randomX = 45 + Math.random() * 10; // Slight movement around center
-    const randomY = 45 + Math.random() * 10;
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
     
-    setBallPosition({ x: randomX, y: randomY });
+    if (!ctx) return;
     
-    ballTrackingRef.current = setTimeout(trackBall, 100); // Update every 100ms
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+    
+    // Simple ball detection using color detection (white/golf ball color)
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    let totalX = 0, totalY = 0, count = 0;
+    
+    // Look for white/light colored pixels that could be a golf ball
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Check if pixel is white/light colored (golf ball)
+      if (r > 200 && g > 200 && b > 200) {
+        const pixelIndex = i / 4;
+        const x = pixelIndex % canvas.width;
+        const y = Math.floor(pixelIndex / canvas.width);
+        
+        totalX += x;
+        totalY += y;
+        count++;
+      }
+    }
+    
+    if (count > 100) { // Only if we found enough white pixels
+      const centerX = (totalX / count / canvas.width) * 100;
+      const centerY = (totalY / count / canvas.height) * 100;
+      
+      setBallPosition({ x: centerX, y: centerY });
+      console.log('Ball detected at:', centerX, centerY);
+    } else {
+      console.log('No ball detected, count:', count);
+      // Keep previous position or set default
+      setBallPosition(prev => prev || { x: 50, y: 50 });
+    }
+    
+    ballTrackingRef.current = setTimeout(trackBall, 200); // Update every 200ms
   };
 
   const startBallTracking = () => {
     if (ballTrackingRef.current) {
       clearTimeout(ballTrackingRef.current);
     }
+    console.log('Starting ball tracking...');
     trackBall();
   };
 
@@ -177,6 +221,7 @@ const DrivingRange: React.FC = () => {
       clearTimeout(ballTrackingRef.current);
       ballTrackingRef.current = null;
     }
+    console.log('Stopping ball tracking...');
   };
 
   const takeShot = () => {
