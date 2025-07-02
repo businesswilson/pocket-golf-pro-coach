@@ -10,7 +10,8 @@ const DrivingRange: React.FC = () => {
   const [selectedClub, setSelectedClub] = useState(golfClubs[0]);
   const [isSwinging, setIsSwinging] = useState(false);
   const [lastShot, setLastShot] = useState<{distance: number, accuracy: string, ballFlight: string} | null>(null);
-  const [ballPosition, setBallPosition] = useState<{x: number, y: number, distance: number} | null>(null);
+  const [ballTrajectory, setBallTrajectory] = useState<{x: number, y: number, distance: number} | null>(null);
+  const [ballPosition, setBallPosition] = useState<{x: number, y: number} | null>(null);
   const [sessionStats, setSessionStats] = useState({
     totalShots: 0,
     averageDistance: 0,
@@ -23,6 +24,7 @@ const DrivingRange: React.FC = () => {
   const [isCalibrating, setIsCalibrating] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
+  const ballTrackingRef = useRef<NodeJS.Timeout | null>(null);
   const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isSwinging);
 
   useEffect(() => {
@@ -117,7 +119,7 @@ const DrivingRange: React.FC = () => {
                     ['slice', 'hook'].includes(ballFlight) ? 'Fair' : 'Poor';
     
     setLastShot({ distance, accuracy, ballFlight });
-    setBallPosition(calculateBallPosition(ballFlight, distance));
+    setBallTrajectory(calculateBallPosition(ballFlight, distance));
     
     const newTotalShots = sessionStats.totalShots + 1;
     const newAverageDistance = Math.round(
@@ -137,6 +139,9 @@ const DrivingRange: React.FC = () => {
       longestDrive: newLongestDrive,
       accuracy: newAccuracy
     });
+    
+    // Restart ball tracking after shot
+    setTimeout(() => startBallTracking(), 1000);
   }
 
   const startCalibration = () => {
@@ -144,15 +149,43 @@ const DrivingRange: React.FC = () => {
     setTimeout(() => {
       setIsCalibrated(true);
       setIsCalibrating(false);
+      startBallTracking(); // Start tracking after calibration
     }, 3000);
+  };
+
+  const trackBall = () => {
+    if (!videoRef.current || !isCalibrated) return;
+    
+    // Simulate ball tracking with random movement
+    const randomX = 45 + Math.random() * 10; // Slight movement around center
+    const randomY = 45 + Math.random() * 10;
+    
+    setBallPosition({ x: randomX, y: randomY });
+    
+    ballTrackingRef.current = setTimeout(trackBall, 100); // Update every 100ms
+  };
+
+  const startBallTracking = () => {
+    if (ballTrackingRef.current) {
+      clearTimeout(ballTrackingRef.current);
+    }
+    trackBall();
+  };
+
+  const stopBallTracking = () => {
+    if (ballTrackingRef.current) {
+      clearTimeout(ballTrackingRef.current);
+      ballTrackingRef.current = null;
+    }
   };
 
   const takeShot = () => {
     if (!isCalibrated) return;
     
     setLastShot(null);
-    setBallPosition(null);
+    setBallTrajectory(null);
     setIsSwinging(true);
+    stopBallTracking(); // Stop tracking during swing
     analysisTimeoutId.current = setTimeout(() => {
         console.log("No swing detected. Finishing shot.");
         finishShot();
@@ -269,8 +302,15 @@ const DrivingRange: React.FC = () => {
                   )}
                   
                   {/* Red ring around ball when calibrated */}
-                  {isCalibrated && !isSwinging && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                  {isCalibrated && !isSwinging && ballPosition && (
+                    <div 
+                      className="absolute pointer-events-none"
+                      style={{
+                        left: `${ballPosition.x}%`,
+                        top: `${ballPosition.y}%`,
+                        transform: 'translate(-50%, -50%)'
+                      }}
+                    >
                       <div className="w-20 h-20 border-4 border-red-500 rounded-full animate-pulse"></div>
                     </div>
                   )}
@@ -329,9 +369,9 @@ const DrivingRange: React.FC = () => {
         </Card>
 
         {/* Ball Trajectory Map */}
-        {lastShot && ballPosition && (
+        {lastShot && ballTrajectory && (
           <BallTrajectoryMap
-            ballPosition={ballPosition}
+            ballPosition={ballTrajectory}
             ballFlight={lastShot.ballFlight}
             carryDistance={lastShot.distance}
           />
