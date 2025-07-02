@@ -84,73 +84,85 @@ const DrivingRange: React.FC = () => {
     
     ctx.drawImage(video, 0, 0);
     
-    // More precise ball detection - look for circular white objects
+    // Look for a golf ball - must be a circular white object
     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
     const data = imageData.data;
     
-    const candidates: Array<{x: number, y: number, size: number}> = [];
-    const step = 4; // Sample every 4th pixel for performance
+    const minBallRadius = 8;
+    const maxBallRadius = 40;
     
-    // Look for clusters of white pixels
-    for (let y = 0; y < canvas.height; y += step) {
-      for (let x = 0; x < canvas.width; x += step) {
-        const i = (y * canvas.width + x) * 4;
-        const r = data[i];
-        const g = data[i + 1];
-        const b = data[i + 2];
-        
-        // Stricter white detection for golf ball
-        if (r > 200 && g > 200 && b > 200) {
-          // Check for circular cluster around this point
-          let clusterSize = 0;
-          const radius = 20;
+    // Search for potential ball centers
+    for (let cy = minBallRadius; cy < canvas.height - minBallRadius; cy += 5) {
+      for (let cx = minBallRadius; cx < canvas.width - minBallRadius; cx += 5) {
+        // Check if this could be the center of a golf ball
+        for (let radius = minBallRadius; radius <= maxBallRadius; radius += 2) {
+          let whitePixels = 0;
+          let totalPixels = 0;
           
-          for (let dy = -radius; dy <= radius; dy += 2) {
-            for (let dx = -radius; dx <= radius; dx += 2) {
-              const checkX = x + dx;
-              const checkY = y + dy;
+          // Check pixels in a circle around this center point
+          for (let angle = 0; angle < 360; angle += 10) {
+            const radian = (angle * Math.PI) / 180;
+            const x = Math.round(cx + radius * Math.cos(radian));
+            const y = Math.round(cy + radius * Math.sin(radian));
+            
+            if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+              const i = (y * canvas.width + x) * 4;
+              const r = data[i];
+              const g = data[i + 1];
+              const b = data[i + 2];
               
-              if (checkX >= 0 && checkX < canvas.width && checkY >= 0 && checkY < canvas.height) {
-                const distance = Math.sqrt(dx * dx + dy * dy);
-                if (distance <= radius) {
-                  const checkI = (checkY * canvas.width + checkX) * 4;
-                  const checkR = data[checkI];
-                  const checkG = data[checkI + 1];
-                  const checkB = data[checkI + 2];
-                  
-                  if (checkR > 200 && checkG > 200 && checkB > 200) {
-                    clusterSize++;
-                  }
-                }
+              totalPixels++;
+              if (r > 220 && g > 220 && b > 220) {
+                whitePixels++;
               }
             }
           }
           
-          if (clusterSize > 50) { // Minimum cluster size for a golf ball
-            candidates.push({ x, y, size: clusterSize });
+          // If most pixels around the circumference are white, this might be a ball
+          if (totalPixels > 0 && whitePixels / totalPixels > 0.7) {
+            // Double-check by looking at the center area
+            let centerWhitePixels = 0;
+            let centerTotalPixels = 0;
+            
+            for (let dy = -radius/2; dy <= radius/2; dy += 2) {
+              for (let dx = -radius/2; dx <= radius/2; dx += 2) {
+                const x = cx + dx;
+                const y = cy + dy;
+                
+                if (x >= 0 && x < canvas.width && y >= 0 && y < canvas.height) {
+                  const distance = Math.sqrt(dx * dx + dy * dy);
+                  if (distance <= radius/2) {
+                    const i = (y * canvas.width + x) * 4;
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    centerTotalPixels++;
+                    if (r > 200 && g > 200 && b > 200) {
+                      centerWhitePixels++;
+                    }
+                  }
+                }
+              }
+            }
+            
+            // If the center is also mostly white, we found a ball!
+            if (centerTotalPixels > 0 && centerWhitePixels / centerTotalPixels > 0.6) {
+              const ballX = (cx / canvas.width) * 100;
+              const ballY = (cy / canvas.height) * 100;
+              
+              console.log('Ball detected at:', ballX, ballY, 'radius:', radius);
+              return { 
+                detected: true, 
+                position: { x: ballX, y: ballY } 
+              };
+            }
           }
         }
       }
     }
     
-    console.log('Ball detection - candidates found:', candidates.length);
-    
-    if (candidates.length > 0) {
-      // Find the largest cluster (most likely to be the golf ball)
-      const bestCandidate = candidates.reduce((best, current) => 
-        current.size > best.size ? current : best
-      );
-      
-      const centerX = (bestCandidate.x / canvas.width) * 100;
-      const centerY = (bestCandidate.y / canvas.height) * 100;
-      
-      console.log('Ball detected at:', centerX, centerY, 'cluster size:', bestCandidate.size);
-      return { 
-        detected: true, 
-        position: { x: centerX, y: centerY } 
-      };
-    }
-    
+    console.log('No ball detected');
     return { detected: false };
   };
 
