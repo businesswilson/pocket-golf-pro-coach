@@ -22,9 +22,11 @@ const DrivingRange: React.FC = () => {
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [isCalibrated, setIsCalibrated] = useState(false);
   const [isCalibrating, setIsCalibrating] = useState(false);
+  const [ballDetected, setBallDetected] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisTimeoutId = useRef<NodeJS.Timeout | null>(null);
   const ballTrackingRef = useRef<NodeJS.Timeout | null>(null);
+  const calibrationRef = useRef<NodeJS.Timeout | null>(null);
   const { swingData, isAnalyzing } = useSwingAnalysis(videoRef, isSwinging);
 
   useEffect(() => {
@@ -36,6 +38,9 @@ const DrivingRange: React.FC = () => {
       if (ballTrackingRef.current) {
         clearTimeout(ballTrackingRef.current);
       }
+      if (calibrationRef.current) {
+        clearTimeout(calibrationRef.current);
+      }
     };
   }, []);
 
@@ -43,7 +48,7 @@ const DrivingRange: React.FC = () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: {
-          facingMode: 'user',
+          facingMode: 'user', // Front camera
           width: { ideal: 1280 },
           height: { ideal: 720 }
         }
@@ -59,6 +64,143 @@ const DrivingRange: React.FC = () => {
       console.error('Error accessing camera:', error);
       setCameraError('Camera access denied or not available');
     }
+  };
+
+  const detectBall = (): { detected: boolean, position?: { x: number, y: number } } => {
+    if (!videoRef.current || !cameraStream) return { detected: false };
+    
+    const video = videoRef.current;
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    
+    if (!ctx) return { detected: false };
+    
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    
+    if (canvas.width === 0 || canvas.height === 0) {
+      return { detected: false };
+    }
+    
+    ctx.drawImage(video, 0, 0);
+    
+    // Ball detection using color detection (white/golf ball color)
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const data = imageData.data;
+    
+    let totalX = 0, totalY = 0, count = 0;
+    
+    // Look for white/light colored pixels that could be a golf ball
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      
+      // Check if pixel is white/light colored (golf ball)
+      if (r > 180 && g > 180 && b > 180) {
+        const pixelIndex = i / 4;
+        const x = pixelIndex % canvas.width;
+        const y = Math.floor(pixelIndex / canvas.width);
+        
+        totalX += x;
+        totalY += y;
+        count++;
+      }
+    }
+    
+    console.log('Ball detection - pixel count:', count);
+    
+    if (count > 500) { // Need significant white pixels for ball detection
+      const centerX = (totalX / count / canvas.width) * 100;
+      const centerY = (totalY / count / canvas.height) * 100;
+      
+      console.log('Ball detected at:', centerX, centerY);
+      return { 
+        detected: true, 
+        position: { x: centerX, y: centerY } 
+      };
+    }
+    
+    return { detected: false };
+  };
+
+  const runCalibration = () => {
+    if (!videoRef.current || !cameraStream) return;
+    
+    const result = detectBall();
+    
+    if (result.detected && result.position) {
+      setBallDetected(true);
+      setBallPosition(result.position);
+      console.log('Ball calibrated successfully at:', result.position);
+      
+      // Continue tracking after successful calibration
+      setTimeout(() => {
+        setIsCalibrated(true);
+        setIsCalibrating(false);
+        startBallTracking();
+      }, 1000);
+    } else {
+      setBallDetected(false);
+      setBallPosition(null);
+      console.log('No ball detected during calibration');
+      
+      // Continue calibration attempts
+      if (isCalibrating) {
+        calibrationRef.current = setTimeout(runCalibration, 500);
+      }
+    }
+  };
+
+  const startCalibration = () => {
+    setIsCalibrating(true);
+    setIsCalibrated(false);
+    setBallDetected(false);
+    setBallPosition(null);
+    
+    // Stop any existing tracking
+    if (ballTrackingRef.current) {
+      clearTimeout(ballTrackingRef.current);
+    }
+    
+    console.log('Starting calibration...');
+    runCalibration();
+  };
+
+  const trackBall = () => {
+    if (!videoRef.current || !isCalibrated || !cameraStream) return;
+    
+    const result = detectBall();
+    
+    if (result.detected && result.position) {
+      setBallPosition(result.position);
+      setBallDetected(true);
+    } else {
+      // Keep previous position for a few frames to avoid flickering
+      setBallDetected(false);
+    }
+    
+    ballTrackingRef.current = setTimeout(trackBall, 200); // Update every 200ms
+  };
+
+  const startBallTracking = () => {
+    if (ballTrackingRef.current) {
+      clearTimeout(ballTrackingRef.current);
+    }
+    console.log('Starting ball tracking...');
+    trackBall();
+  };
+
+  const stopBallTracking = () => {
+    if (ballTrackingRef.current) {
+      clearTimeout(ballTrackingRef.current);
+      ballTrackingRef.current = null;
+    }
+    if (calibrationRef.current) {
+      clearTimeout(calibrationRef.current);
+      calibrationRef.current = null;
+    }
+    console.log('Stopping ball tracking...');
   };
 
   const calculateBallFlight = (swingData: ComprehensiveSwingData): string => {
@@ -147,83 +289,6 @@ const DrivingRange: React.FC = () => {
     setTimeout(() => startBallTracking(), 1000);
   }
 
-  const startCalibration = () => {
-    setIsCalibrating(true);
-    setTimeout(() => {
-      setIsCalibrated(true);
-      setIsCalibrating(false);
-      startBallTracking(); // Start tracking after calibration
-    }, 3000);
-  };
-
-  const trackBall = () => {
-    if (!videoRef.current || !isCalibrated || !cameraStream) return;
-    
-    const video = videoRef.current;
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) return;
-    
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    
-    // Simple ball detection using color detection (white/golf ball color)
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-    const data = imageData.data;
-    
-    let totalX = 0, totalY = 0, count = 0;
-    
-    // Look for white/light colored pixels that could be a golf ball
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      
-      // Check if pixel is white/light colored (golf ball)
-      if (r > 200 && g > 200 && b > 200) {
-        const pixelIndex = i / 4;
-        const x = pixelIndex % canvas.width;
-        const y = Math.floor(pixelIndex / canvas.width);
-        
-        totalX += x;
-        totalY += y;
-        count++;
-      }
-    }
-    
-    if (count > 100) { // Only if we found enough white pixels
-      const centerX = (totalX / count / canvas.width) * 100;
-      const centerY = (totalY / count / canvas.height) * 100;
-      
-      setBallPosition({ x: centerX, y: centerY });
-      console.log('Ball detected at:', centerX, centerY);
-    } else {
-      console.log('No ball detected, count:', count);
-      // Keep previous position or set default
-      setBallPosition(prev => prev || { x: 50, y: 50 });
-    }
-    
-    ballTrackingRef.current = setTimeout(trackBall, 200); // Update every 200ms
-  };
-
-  const startBallTracking = () => {
-    if (ballTrackingRef.current) {
-      clearTimeout(ballTrackingRef.current);
-    }
-    console.log('Starting ball tracking...');
-    trackBall();
-  };
-
-  const stopBallTracking = () => {
-    if (ballTrackingRef.current) {
-      clearTimeout(ballTrackingRef.current);
-      ballTrackingRef.current = null;
-    }
-    console.log('Stopping ball tracking...');
-  };
-
   const takeShot = () => {
     if (!isCalibrated) return;
     
@@ -291,7 +356,12 @@ const DrivingRange: React.FC = () => {
             </CardHeader>
             <CardContent>
               <div className="text-center space-y-4">
-                <p className="text-gray-600">Calibrate ball detection before starting your session</p>
+                <p className="text-gray-600">
+                  {isCalibrating 
+                    ? (ballDetected ? 'Ball detected! Finalizing...' : 'Looking for golf ball in camera view...') 
+                    : 'Place a golf ball in the camera view and calibrate ball detection'
+                  }
+                </p>
                 <Button
                   onClick={startCalibration}
                   disabled={isCalibrating || !cameraStream}
@@ -346,17 +416,19 @@ const DrivingRange: React.FC = () => {
                     </div>
                   )}
                   
-                  {/* Red ring around ball when calibrated */}
-                  {isCalibrated && !isSwinging && ballPosition && (
+                  {/* Red ring around ball when detected */}
+                  {ballPosition && (isCalibrated || (isCalibrating && ballDetected)) && (
                     <div 
-                      className="absolute pointer-events-none"
+                      className="absolute pointer-events-none z-10"
                       style={{
                         left: `${ballPosition.x}%`,
                         top: `${ballPosition.y}%`,
                         transform: 'translate(-50%, -50%)'
                       }}
                     >
-                      <div className="w-20 h-20 border-4 border-red-500 rounded-full animate-pulse"></div>
+                      <div className={`w-16 h-16 border-4 rounded-full ${
+                        isCalibrated ? 'border-red-500 animate-pulse' : 'border-green-500'
+                      }`}></div>
                     </div>
                   )}
                   
@@ -372,7 +444,7 @@ const DrivingRange: React.FC = () => {
                   )}
                   {isCalibrating && (
                     <div className="absolute top-4 left-4 bg-blue-500 text-white px-2 py-1 rounded text-sm">
-                      Calibrating...
+                      {ballDetected ? 'Ball Found!' : 'Looking for ball...'}
                     </div>
                   )}
                   {cameraStream && !isSwinging && !isCalibrating && (
@@ -404,7 +476,12 @@ const DrivingRange: React.FC = () => {
             {isCalibrated && (
               <Button
                 variant="outline"
-                onClick={() => setIsCalibrated(false)}
+                onClick={() => {
+                  setIsCalibrated(false);
+                  setBallDetected(false);
+                  setBallPosition(null);
+                  stopBallTracking();
+                }}
                 className="w-full mt-2"
               >
                 Recalibrate
